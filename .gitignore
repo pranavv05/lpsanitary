@@ -1,0 +1,16 @@
+# Dependencies
+/node_modules
+/.pnp
+.pnp.js
+.yarn/install-state.gz
+
+# Local Environment Variables
+.env*.local
+
+# Next.js build output
+/.next/
+/out/
+
+# Other
+/coverage
+*.log
