@@ -37,7 +37,25 @@ export default function Home() {
   }, []);
 
   const openCatalog = (brand: { name: string; catalog: string }) => {
-    window.open(brand.catalog, '_blank');
+    try {
+      // First try to open in a new tab
+      const newWindow = window.open(brand.catalog, '_blank');
+      
+      // If popup is blocked, provide alternative
+      if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
+        // Fallback: direct navigation
+        window.location.href = brand.catalog;
+      }
+    } catch (error) {
+      console.error('Error opening catalog:', error);
+      // Alternative: try to download the file
+      const link = document.createElement('a');
+      link.href = brand.catalog;
+      link.download = `${brand.name}-Catalog.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
   };
 
   return (
