@@ -22,25 +22,42 @@ export default function PDFViewerModal({ isOpen, onClose, pdfUrl, brandName }: P
 
   const handleIframeLoad = () => {
     setLoading(false);
+    setError(null);
   };
 
   const handleIframeError = () => {
     setLoading(false);
-    setError('Failed to load PDF. Click "Open in New Tab" to view the catalog.');
+    setError('PDF viewer not available. Use the buttons below to open or download the catalog.');
   };
 
   const openInNewTab = () => {
-    window.open(pdfUrl, '_blank', 'noopener,noreferrer');
+    try {
+      const newWindow = window.open(pdfUrl, '_blank', 'noopener,noreferrer');
+      if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
+        // If popup is blocked, try direct navigation
+        window.location.href = pdfUrl;
+      }
+    } catch (error) {
+      console.error('Failed to open in new tab:', error);
+      // Fallback to download
+      downloadPDF();
+    }
   };
 
   const downloadPDF = () => {
-    const link = document.createElement('a');
-    link.href = pdfUrl;
-    link.download = `${brandName}-Catalog.pdf`;
-    link.target = '_blank';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    try {
+      const link = document.createElement('a');
+      link.href = pdfUrl;
+      link.download = `${brandName}-Catalog.pdf`;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (error) {
+      console.error('Download failed:', error);
+      alert('Unable to download. Please try opening in a new tab.');
+    }
   };
 
   if (!isOpen) return null;
@@ -83,7 +100,7 @@ export default function PDFViewerModal({ isOpen, onClose, pdfUrl, brandName }: P
         {/* Content */}
         <div className="flex-1 relative">
           {loading && (
-            <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
+            <div className="absolute inset-0 flex items-center justify-center bg-gray-100 z-10">
               <div className="text-center">
                 <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
                 <p className="text-gray-600">Loading catalog...</p>
@@ -92,10 +109,10 @@ export default function PDFViewerModal({ isOpen, onClose, pdfUrl, brandName }: P
           )}
 
           {error && (
-            <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
+            <div className="absolute inset-0 flex items-center justify-center bg-gray-100 z-10">
               <div className="text-center p-8">
-                <div className="text-red-500 text-4xl mb-4">
-                  <i className="ri-error-warning-line"></i>
+                <div className="text-yellow-500 text-4xl mb-4">
+                  <i className="ri-information-line"></i>
                 </div>
                 <p className="text-gray-700 mb-4">{error}</p>
                 <div className="space-x-4">
@@ -103,12 +120,14 @@ export default function PDFViewerModal({ isOpen, onClose, pdfUrl, brandName }: P
                     onClick={openInNewTab}
                     className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
                   >
+                    <i className="ri-external-link-line mr-2"></i>
                     Open in New Tab
                   </button>
                   <button
                     onClick={downloadPDF}
                     className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
                   >
+                    <i className="ri-download-line mr-2"></i>
                     Download PDF
                   </button>
                 </div>
@@ -116,12 +135,14 @@ export default function PDFViewerModal({ isOpen, onClose, pdfUrl, brandName }: P
             </div>
           )}
 
+          {/* Try multiple iframe approaches for better compatibility */}
           <iframe
-            src={pdfUrl}
+            src={`${pdfUrl}#toolbar=1&navpanes=1&scrollbar=1&page=1&view=FitH`}
             className="w-full h-full border-none"
             title={`${brandName} Product Catalog`}
             onLoad={handleIframeLoad}
             onError={handleIframeError}
+            style={{ minHeight: '600px' }}
           />
         </div>
       </div>

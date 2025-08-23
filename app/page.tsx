@@ -42,23 +42,30 @@ export default function Home() {
   }, []);
 
   const openCatalog = async (brand: { name: string; catalog: string }) => {
-    // Method 1: Try the robust PDF handler first
+    // Try the robust PDF handler first for direct browser viewing
     try {
       await openPDFCatalog(brand.catalog, brand.name, {
         onLoading: (loading) => setLoadingCatalog(loading ? brand.name : null),
         onSuccess: () => {
-          console.log(`Successfully opened ${brand.name} catalog`);
+          console.log(`Successfully opened ${brand.name} catalog in browser`);
         },
         onError: (error) => {
-          console.warn(`PDF handler failed for ${brand.name}:`, error);
-          // Method 2: Fallback to modal viewer
-          setSelectedPDF({ url: brand.catalog, brand: brand.name });
-          setModalOpen(true);
+          // If direct opening fails or returns 'SHOW_MODAL', use modal viewer
+          if (error === 'SHOW_MODAL' || error.includes('failed')) {
+            console.log(`Opening ${brand.name} catalog in modal viewer`);
+            setSelectedPDF({ url: brand.catalog, brand: brand.name });
+            setModalOpen(true);
+          } else {
+            console.warn(`PDF handler error for ${brand.name}:`, error);
+            // Still show modal as fallback
+            setSelectedPDF({ url: brand.catalog, brand: brand.name });
+            setModalOpen(true);
+          }
         }
       });
     } catch (error) {
-      console.error(`Failed to open catalog for ${brand.name}:`, error);
-      // Method 3: Final fallback - show modal
+      console.log(`Opening ${brand.name} catalog in modal viewer as fallback`);
+      // Always fall back to modal viewer for inline viewing
       setSelectedPDF({ url: brand.catalog, brand: brand.name });
       setModalOpen(true);
     }
@@ -137,12 +144,12 @@ export default function Home() {
                             {loadingCatalog === brand.name ? (
                               <>
                                 <div className="w-4 h-4 border-2 border-purple-600 border-t-transparent rounded-full animate-spin mr-2"></div>
-                                <span className="text-sm font-medium">Loading...</span>
+                                <span className="text-sm font-medium">Opening...</span>
                               </>
                             ) : (
                               <>
                                 <div className="w-4 h-4 flex items-center justify-center mr-2">
-                                  <i className="ri-download-line"></i>
+                                  <i className="ri-eye-line"></i>
                                 </div>
                                 <span className="text-sm font-medium">View Catalog</span>
                               </>

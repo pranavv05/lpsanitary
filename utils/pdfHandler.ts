@@ -67,52 +67,44 @@ export class PDFHandler {
     try {
       onLoading?.(true);
 
-      // Method 1: Check if PDF exists
-      const exists = await this.checkPDFExists(pdfUrl);
-      if (!exists) {
-        throw new Error('PDF file not found or inaccessible');
-      }
-
-      // Method 2: Try to open in new tab first
+      // Method 1: Try to open in new tab with PDF viewer
       const openedInTab = this.openInNewTab(pdfUrl);
       if (openedInTab) {
         onSuccess?.();
         return;
       }
 
-      // Method 3: Download as blob and create object URL
+      // Method 2: Check if PDF exists and try blob URL for inline viewing
       try {
-        const blob = await this.downloadPDFAsBlob(pdfUrl);
-        const blobURL = this.createBlobURL(blob);
-        
-        const openedBlobInTab = this.openInNewTab(blobURL);
-        if (openedBlobInTab) {
-          onSuccess?.();
-          // Clean up blob URL after a delay
-          setTimeout(() => URL.revokeObjectURL(blobURL), 30000);
-          return;
+        const exists = await this.checkPDFExists(pdfUrl);
+        if (exists) {
+          const blob = await this.downloadPDFAsBlob(pdfUrl);
+          const blobURL = this.createBlobURL(blob);
+          
+          // Try to open blob URL in new tab for inline viewing
+          const openedBlobInTab = this.openInNewTab(blobURL);
+          if (openedBlobInTab) {
+            onSuccess?.();
+            // Clean up blob URL after a delay
+            setTimeout(() => URL.revokeObjectURL(blobURL), 30000);
+            return;
+          }
+          
+          // Clean up blob URL if opening failed
+          URL.revokeObjectURL(blobURL);
         }
-
-        // Method 4: Trigger download
-        this.triggerDownload(blobURL, `${brandName}-Catalog.pdf`);
-        onSuccess?.();
-        
-        // Clean up blob URL
-        setTimeout(() => URL.revokeObjectURL(blobURL), 5000);
-        return;
-        
       } catch (blobError) {
-        console.warn('Blob method failed:', blobError);
+        console.warn('Blob method failed, trying modal viewer:', blobError);
       }
 
-      // Method 5: Direct navigation fallback
-      this.navigateToURL(pdfUrl);
-      onSuccess?.();
+      // Method 3: If direct opening fails, show modal viewer for inline viewing
+      // This will be handled by the calling component
+      throw new Error('Direct PDF opening failed - use modal viewer');
 
     } catch (error) {
-      console.error('All PDF opening methods failed:', error);
-      const errorMessage = `Unable to open ${brandName} catalog. Please try again or contact support.`;
-      onError?.(errorMessage);
+      console.log('PDF opening methods exhausted, falling back to modal viewer');
+      // Don't show error - let the modal viewer handle it
+      onError?.('SHOW_MODAL');
     } finally {
       onLoading?.(false);
     }
