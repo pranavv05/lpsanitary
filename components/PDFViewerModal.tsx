@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 interface PDFViewerModalProps {
   isOpen: boolean;
@@ -12,17 +12,61 @@ interface PDFViewerModalProps {
 export default function PDFViewerModal({ isOpen, onClose, pdfUrl, brandName }: PDFViewerModalProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [loadingProgress, setLoadingProgress] = useState(0);
+  const [estimatedSize, setEstimatedSize] = useState<string>('');
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     if (isOpen) {
       setLoading(true);
       setError(null);
+      setLoadingProgress(0);
+      
+      // Estimate file size based on brand name
+      const sizeEstimates: { [key: string]: string } = {
+        'Blues': '~76 MB - Large file, may take 30-60 seconds',
+        'Jaquar': '~60 MB - Large file, may take 25-50 seconds', 
+        'JAQUAR': '~60 MB - Large file, may take 25-50 seconds',
+        'Steellera': '~32 MB - Medium file, may take 15-30 seconds',
+        'Karoma': '~21 MB - Medium file, may take 10-25 seconds',
+        'Nirali': '~8 MB - Small file, should load quickly',
+        'Cera': '~6 MB - Small file, should load quickly',
+        'Roff': '~2 MB - Very small, loads instantly'
+      };
+      
+      setEstimatedSize(sizeEstimates[brandName] || 'Loading...');
+      
+      // Set a timeout for very large files (30 seconds)
+      timeoutRef.current = setTimeout(() => {
+        if (loading) {
+          setError(`Large file taking longer than expected. You can still open it in a new tab or download it directly.`);
+          setLoading(false);
+        }
+      }, 30000);
+      
+      // Simulate loading progress for user feedback
+      const progressInterval = setInterval(() => {
+        setLoadingProgress(prev => {
+          if (prev >= 90) return prev;
+          return prev + Math.random() * 15;
+        });
+      }, 1000);
+      
+      return () => {
+        clearTimeout(timeoutRef.current!);
+        clearInterval(progressInterval);
+      };
     }
-  }, [isOpen, pdfUrl]);
+  }, [isOpen, pdfUrl, brandName, loading]);
 
   const handleIframeLoad = () => {
     setLoading(false);
     setError(null);
+    setLoadingProgress(100);
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
   };
 
   const handleIframeError = () => {
@@ -101,9 +145,36 @@ export default function PDFViewerModal({ isOpen, onClose, pdfUrl, brandName }: P
         <div className="flex-1 relative">
           {loading && (
             <div className="absolute inset-0 flex items-center justify-center bg-gray-100 z-10">
-              <div className="text-center">
-                <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-                <p className="text-gray-600">Loading catalog...</p>
+              <div className="text-center max-w-md px-6">
+                <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                <p className="text-gray-800 font-medium mb-2">Loading {brandName} Catalog</p>
+                <p className="text-gray-600 text-sm mb-4">{estimatedSize}</p>
+                
+                {/* Progress Bar */}
+                <div className="w-full bg-gray-200 rounded-full h-2 mb-4">
+                  <div 
+                    className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                    style={{ width: `${loadingProgress}%` }}
+                  ></div>
+                </div>
+                
+                <div className="space-y-2">
+                  <p className="text-gray-500 text-xs">Taking too long?</p>
+                  <div className="space-x-2">
+                    <button
+                      onClick={openInNewTab}
+                      className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                    >
+                      Open in New Tab
+                    </button>
+                    <button
+                      onClick={downloadPDF}
+                      className="px-3 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
+                    >
+                      Download Instead
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           )}

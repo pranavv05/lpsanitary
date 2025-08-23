@@ -16,6 +16,17 @@ export default function Home() {
   // --- MODIFIED SECTION START ---
   // Updated the 'catalog' paths to point to your local files
   // in the public/resources/ directory.
+  // Add file size information for user awareness
+  const brandSizes = {
+    'Blues': { size: '76 MB', warning: true },
+    'Jaquar': { size: '60 MB', warning: true },
+    'Steellera': { size: '32 MB', warning: true },
+    'Karoma': { size: '21 MB', warning: false },
+    'Nirali': { size: '8 MB', warning: false },
+    'Cera': { size: '6 MB', warning: false },
+    'Roff': { size: '2 MB', warning: false }
+  } as const;
+
   const brands = [
     { name: 'Roff', catalog: '/resources/Roff-Product-Catalogue.pdf' },
     { name: 'Jaquar', catalog: '/resources/JAQUAR_CATLOUGE.pdf' },
@@ -139,7 +150,18 @@ export default function Home() {
                           <div className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-2 group-hover:from-purple-600 group-hover:to-pink-600 transition-all duration-300">
                             {brand.name}
                           </div>
-                          <div className="text-gray-600 mb-3">Premium Quality</div>
+                          <div className="text-gray-600 mb-1">Premium Quality</div>
+                          
+                          {/* File Size Indicator */}
+                          <div className="text-xs text-gray-500 mb-3">
+                            {brandSizes[brand.name as keyof typeof brandSizes]?.size || 'Loading...'}
+                            {brandSizes[brand.name as keyof typeof brandSizes]?.warning && (
+                              <span className="text-amber-600 ml-1" title="Large file - may take time to load">
+                                <i className="ri-time-line"></i>
+                              </span>
+                            )}
+                          </div>
+                          
                           <div className="flex items-center justify-center text-purple-600 hover:text-purple-700 transition-colors">
                             {loadingCatalog === brand.name ? (
                               <>

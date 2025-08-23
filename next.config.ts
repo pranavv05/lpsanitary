@@ -7,6 +7,7 @@ const nextConfig: NextConfig = {
   typescript: {
     // ignoreBuildErrors: true,
   },
+  compress: true, // Enable gzip compression
   async headers() {
     return [
       {
@@ -27,6 +28,15 @@ const nextConfig: NextConfig = {
           {
             key: 'Access-Control-Allow-Origin',
             value: '*',
+          },
+          // Add performance hints for large files
+          {
+            key: 'X-Content-Type-Options',
+            value: 'nosniff',
+          },
+          {
+            key: 'Accept-Ranges',
+            value: 'bytes', // Enable partial content requests
           },
         ],
       },
