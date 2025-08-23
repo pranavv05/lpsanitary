@@ -4,10 +4,14 @@ import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
+import PDFViewerModal from '@/components/PDFViewerModal';
+import { openPDFCatalog } from '@/utils/pdfHandler';
 
 export default function Home() {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [loadingCatalog, setLoadingCatalog] = useState<string | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [selectedPDF, setSelectedPDF] = useState<{ url: string; brand: string } | null>(null);
 
   // --- MODIFIED SECTION START ---
   // Updated the 'catalog' paths to point to your local files
@@ -38,48 +42,31 @@ export default function Home() {
   }, []);
 
   const openCatalog = async (brand: { name: string; catalog: string }) => {
-    setLoadingCatalog(brand.name);
-    
+    // Method 1: Try the robust PDF handler first
     try {
-      // First, check if the file exists by making a HEAD request
-      const response = await fetch(brand.catalog, { method: 'HEAD' });
-      
-      if (!response.ok) {
-        throw new Error(`PDF not found: ${response.status}`);
-      }
-      
-      // Method 1: Try to open in a new tab
-      const newWindow = window.open(brand.catalog, '_blank', 'noopener,noreferrer');
-      
-      // Check if popup was blocked
-      if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
-        // Method 2: Use direct navigation
-        window.location.href = brand.catalog;
-      }
+      await openPDFCatalog(brand.catalog, brand.name, {
+        onLoading: (loading) => setLoadingCatalog(loading ? brand.name : null),
+        onSuccess: () => {
+          console.log(`Successfully opened ${brand.name} catalog`);
+        },
+        onError: (error) => {
+          console.warn(`PDF handler failed for ${brand.name}:`, error);
+          // Method 2: Fallback to modal viewer
+          setSelectedPDF({ url: brand.catalog, brand: brand.name });
+          setModalOpen(true);
+        }
+      });
     } catch (error) {
-      console.error('Error opening catalog:', error);
-      
-      // Method 3: Try direct download as fallback
-      try {
-        const link = document.createElement('a');
-        link.href = brand.catalog;
-        link.download = `${brand.name}-Catalog.pdf`;
-        link.target = '_blank';
-        link.rel = 'noopener noreferrer';
-        
-        // Append to body, click, and remove
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-      } catch (downloadError) {
-        console.error('Download fallback failed:', downloadError);
-        
-        // Method 4: Show user-friendly error message
-        alert(`Sorry, we couldn't open the ${brand.name} catalog. Please contact us for assistance.`);
-      }
-    } finally {
-      setLoadingCatalog(null);
+      console.error(`Failed to open catalog for ${brand.name}:`, error);
+      // Method 3: Final fallback - show modal
+      setSelectedPDF({ url: brand.catalog, brand: brand.name });
+      setModalOpen(true);
     }
+  };
+
+  const closeModal = () => {
+    setModalOpen(false);
+    setSelectedPDF(null);
   };
 
   return (
@@ -358,6 +345,16 @@ export default function Home() {
       </section>
 
       <Footer />
+      
+      {/* PDF Viewer Modal */}
+      {selectedPDF && (
+        <PDFViewerModal
+          isOpen={modalOpen}
+          onClose={closeModal}
+          pdfUrl={selectedPDF.url}
+          brandName={selectedPDF.brand}
+        />
+      )}
     </div>
   );
 }
