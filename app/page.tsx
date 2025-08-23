@@ -7,6 +7,7 @@ import Footer from '@/components/Footer';
 
 export default function Home() {
   const [currentSlide, setCurrentSlide] = useState(0);
+  const [loadingCatalog, setLoadingCatalog] = useState<string | null>(null);
 
   // --- MODIFIED SECTION START ---
   // Updated the 'catalog' paths to point to your local files
@@ -36,25 +37,48 @@ export default function Home() {
     return () => clearInterval(interval);
   }, []);
 
-  const openCatalog = (brand: { name: string; catalog: string }) => {
+  const openCatalog = async (brand: { name: string; catalog: string }) => {
+    setLoadingCatalog(brand.name);
+    
     try {
-      // First try to open in a new tab
-      const newWindow = window.open(brand.catalog, '_blank');
+      // First, check if the file exists by making a HEAD request
+      const response = await fetch(brand.catalog, { method: 'HEAD' });
       
-      // If popup is blocked, provide alternative
+      if (!response.ok) {
+        throw new Error(`PDF not found: ${response.status}`);
+      }
+      
+      // Method 1: Try to open in a new tab
+      const newWindow = window.open(brand.catalog, '_blank', 'noopener,noreferrer');
+      
+      // Check if popup was blocked
       if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
-        // Fallback: direct navigation
+        // Method 2: Use direct navigation
         window.location.href = brand.catalog;
       }
     } catch (error) {
       console.error('Error opening catalog:', error);
-      // Alternative: try to download the file
-      const link = document.createElement('a');
-      link.href = brand.catalog;
-      link.download = `${brand.name}-Catalog.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      
+      // Method 3: Try direct download as fallback
+      try {
+        const link = document.createElement('a');
+        link.href = brand.catalog;
+        link.download = `${brand.name}-Catalog.pdf`;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        
+        // Append to body, click, and remove
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } catch (downloadError) {
+        console.error('Download fallback failed:', downloadError);
+        
+        // Method 4: Show user-friendly error message
+        alert(`Sorry, we couldn't open the ${brand.name} catalog. Please contact us for assistance.`);
+      }
+    } finally {
+      setLoadingCatalog(null);
     }
   };
 
@@ -123,10 +147,19 @@ export default function Home() {
                           </div>
                           <div className="text-gray-600 mb-3">Premium Quality</div>
                           <div className="flex items-center justify-center text-purple-600 hover:text-purple-700 transition-colors">
-                            <div className="w-4 h-4 flex items-center justify-center mr-2">
-                              <i className="ri-download-line"></i>
-                            </div>
-                            <span className="text-sm font-medium">View Catalog</span>
+                            {loadingCatalog === brand.name ? (
+                              <>
+                                <div className="w-4 h-4 border-2 border-purple-600 border-t-transparent rounded-full animate-spin mr-2"></div>
+                                <span className="text-sm font-medium">Loading...</span>
+                              </>
+                            ) : (
+                              <>
+                                <div className="w-4 h-4 flex items-center justify-center mr-2">
+                                  <i className="ri-download-line"></i>
+                                </div>
+                                <span className="text-sm font-medium">View Catalog</span>
+                              </>
+                            )}
                           </div>
                         </div>
                       ))}
