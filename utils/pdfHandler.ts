@@ -13,7 +13,8 @@ export class PDFHandler {
   private static async checkPDFExists(url: string): Promise<boolean> {
     try {
       const response = await fetch(url, { method: 'HEAD' });
-      return response.ok && response.headers.get('content-type')?.includes('pdf');
+      const contentType = response.headers.get('content-type');
+      return response.ok && (contentType?.includes('pdf') ?? false);
     } catch {
       return false;
     }
