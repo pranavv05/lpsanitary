@@ -182,30 +182,35 @@ export default function PDFViewerModal({ isOpen, onClose, pdfUrl, brandName }: P
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75">
       <div className="bg-white rounded-lg shadow-xl w-full max-w-6xl h-full max-h-[90vh] flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b">
-          <h2 className="text-xl font-semibold text-gray-800">
-            {brandName} Product Catalog
-          </h2>
+        <div className="flex items-center justify-between p-4 border-b bg-gray-50">
+          <div>
+            <h2 className="text-xl font-semibold text-gray-800">
+              {brandName} Product Catalog
+            </h2>
+            <p className="text-sm text-gray-600 mt-1">
+              {estimatedSize && `File size: ${estimatedSize.split(' - ')[0]}`}
+            </p>
+          </div>
           <div className="flex items-center space-x-2">
             <button
               onClick={openInNewTab}
-              className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+              className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center"
               title="Open in new tab"
             >
-              <i className="ri-external-link-line mr-1"></i>
+              <i className="ri-external-link-line mr-2"></i>
               New Tab
             </button>
             <button
               onClick={downloadPDF}
-              className="px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
+              className="px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center"
               title="Download PDF"
             >
-              <i className="ri-download-line mr-1"></i>
+              <i className="ri-download-line mr-2"></i>
               Download
             </button>
             <button
               onClick={onClose}
-              className="text-gray-500 hover:text-gray-700 text-xl font-bold"
+              className="text-gray-500 hover:text-gray-700 text-2xl font-bold p-1"
               title="Close"
             >
               ×

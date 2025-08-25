@@ -13,6 +13,25 @@ export default function Home() {
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedPDF, setSelectedPDF] = useState<{ url: string; brand: string } | null>(null);
 
+  // Cleanup effect to prevent stuck loading states
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (loadingCatalog) {
+        console.warn(`Clearing stuck loading state for ${loadingCatalog}`);
+        setLoadingCatalog(null);
+      }
+    }, 10000); // 10 second global timeout
+
+    return () => clearTimeout(timeoutId);
+  }, [loadingCatalog]);
+
+  // Clear loading state when modal opens
+  useEffect(() => {
+    if (modalOpen) {
+      setLoadingCatalog(null);
+    }
+  }, [modalOpen]);
+
   // --- MODIFIED SECTION START ---
   // Updated the 'catalog' paths to point to your local files
   // in the public/resources/ directory.
@@ -57,45 +76,22 @@ export default function Home() {
     downloadPDFCatalog(brand.catalog, brand.name);
   };
 
-  const openCatalog = async (brand: { name: string; catalog: string }) => {
-    console.log(`User clicked on ${brand.name} catalog`);
+  const openCatalog = (brand: { name: string; catalog: string }) => {
+    console.log(`User clicked on ${brand.name} catalog - opening in modal viewer`);
     
-    try {
-      await openPDFCatalog(brand.catalog, brand.name, {
-        onLoading: (loading) => {
-          setLoadingCatalog(loading ? brand.name : null);
-          if (loading) {
-            console.log(`Loading ${brand.name} catalog...`);
-          }
-        },
-        onSuccess: () => {
-          console.log(`Successfully opened ${brand.name} catalog`);
-          setLoadingCatalog(null);
-        },
-        onError: (error) => {
-          console.log(`PDF handler returned: ${error} for ${brand.name}`);
-          setLoadingCatalog(null);
-          
-          // Always show modal as fallback for any error
-          console.log(`Opening ${brand.name} catalog in modal viewer`);
-          setSelectedPDF({ url: brand.catalog, brand: brand.name });
-          setModalOpen(true);
-        }
-      });
-    } catch (error) {
-      console.error(`Unexpected error opening ${brand.name} catalog:`, error);
-      setLoadingCatalog(null);
-      
-      // Always fall back to modal viewer
-      console.log(`Opening ${brand.name} catalog in modal viewer as final fallback`);
-      setSelectedPDF({ url: brand.catalog, brand: brand.name });
-      setModalOpen(true);
-    }
+    // Clear any existing loading state
+    setLoadingCatalog(null);
+    
+    // Open directly in modal to avoid black screen issues
+    setSelectedPDF({ url: brand.catalog, brand: brand.name });
+    setModalOpen(true);
   };
 
   const closeModal = () => {
     setModalOpen(false);
     setSelectedPDF(null);
+    // Ensure loading state is cleared when modal is closed
+    setLoadingCatalog(null);
   };
 
   return (
@@ -181,22 +177,13 @@ export default function Home() {
                               className="flex items-center justify-center text-purple-600 hover:text-purple-700 transition-colors group-hover:scale-105 cursor-pointer"
                               onClick={() => openCatalog(brand)}
                             >
-                              {loadingCatalog === brand.name ? (
-                                <>
-                                  <div className="w-4 h-4 border-2 border-purple-600 border-t-transparent rounded-full animate-spin mr-2"></div>
-                                  <span className="text-sm font-medium">Opening...</span>
-                                </>
-                              ) : (
-                                <>
-                                  <div className="w-4 h-4 flex items-center justify-center mr-2">
-                                    <i className="ri-eye-line"></i>
-                                  </div>
-                                  <span className="text-sm font-medium">View Catalog</span>
-                                  <div className="w-4 h-4 flex items-center justify-center ml-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <i className="ri-external-link-line text-xs"></i>
-                                  </div>
-                                </>
-                              )}
+                              <div className="w-4 h-4 flex items-center justify-center mr-2">
+                                <i className="ri-eye-line"></i>
+                              </div>
+                              <span className="text-sm font-medium">View Catalog</span>
+                              <div className="w-4 h-4 flex items-center justify-center ml-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <i className="ri-external-link-line text-xs"></i>
+                              </div>
                             </div>
                             
                             {/* Download Button */}

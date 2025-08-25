@@ -120,6 +120,14 @@ export class PDFHandler {
     try {
       onLoading?.(true);
       
+      // If user prefers modal, skip new tab attempts and go directly to modal
+      if (preferModal) {
+        console.log(`Using modal viewer for ${brandName} catalog (preferred method)`);
+        onLoading?.(false);
+        onError?.('SHOW_MODAL');
+        return;
+      }
+      
       // If user prefers modal or we're on mobile, skip new tab attempt
       const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
       
