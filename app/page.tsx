@@ -110,6 +110,12 @@ export default function Home() {
       const blob = await pdfResponse.blob();
       console.log(`✅ PDF blob created, size: ${blob.size} bytes`);
       
+      // Check if blob size is reasonable (should be at least 1KB for a real PDF)
+      if (blob.size < 1024) {
+        console.warn(`⚠️ Blob size too small (${blob.size} bytes), likely an error response`);
+        throw new Error(`Blob size too small: ${blob.size} bytes`);
+      }
+      
       // Verify blob is actually a PDF
       if (blob.type && !blob.type.includes('pdf')) {
         console.warn(`⚠️ Unexpected blob type: ${blob.type}`);
@@ -185,13 +191,15 @@ export default function Home() {
           // Method 4: Provide direct URLs as last resort
           const staticUrl = `${window.location.origin}${brand.catalog}`;
           const apiUrlFull = `${window.location.origin}${apiUrl}`;
+          const debugUrl = `${window.location.origin}/api/debug`;
           console.log(`📄 Providing direct URLs - API: ${apiUrlFull}, Static: ${staticUrl}`);
+          console.log(`🔍 Debug info available at: ${debugUrl}`);
           
-          alert(`Unable to download ${brand.name} catalog automatically.\n\nPlease try these solutions:\n\n1. API Route: ${apiUrlFull}\n2. Static File: ${staticUrl}\n3. Right-click the "Download Catalog" button and select "Save link as"\n4. Try the "Test PDF URL" button to open in browser\n5. Contact support if the issue persists\n\nError: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          alert(`Unable to download ${brand.name} catalog automatically.\n\nPlease try these solutions:\n\n1. API Route: ${apiUrlFull}\n2. Static File: ${staticUrl}\n3. Right-click the "Download Catalog" button and select "Save link as"\n4. Try the "Test PDF URL" button to open in browser\n5. Debug info: ${debugUrl}\n6. Contact support if the issue persists\n\nError: ${error instanceof Error ? error.message : 'Unknown error'}`);
           
           // Copy URLs to clipboard if possible
           try {
-            await navigator.clipboard.writeText(`API Route: ${apiUrlFull}\nStatic File: ${staticUrl}`);
+            await navigator.clipboard.writeText(`API Route: ${apiUrlFull}\nStatic File: ${staticUrl}\nDebug: ${debugUrl}`);
             console.log(`✅ URLs copied to clipboard`);
           } catch (clipboardError) {
             console.log(`❌ Failed to copy to clipboard:`, clipboardError);
@@ -316,6 +324,22 @@ export default function Home() {
                               <i className="ri-external-link-line mr-1"></i>
                               Test PDF URL
                             </button>
+                            
+                            {/* Debug button - only show for first brand to avoid clutter */}
+                            {index === 0 && (
+                              <button 
+                                className="w-full text-xs text-amber-600 hover:text-amber-700 transition-colors py-1 mt-1"
+                                onClick={() => {
+                                  const debugUrl = '/api/debug';
+                                  console.log(`🔍 Opening debug info: ${window.location.origin}${debugUrl}`);
+                                  window.open(debugUrl, '_blank');
+                                }}
+                                title="Debug file paths in production"
+                              >
+                                <i className="ri-bug-line mr-1"></i>
+                                Debug Info
+                              </button>
+                            )}
                           </div>
                           
                           <p className="text-xs text-gray-500 mt-2">
