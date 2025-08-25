@@ -47,36 +47,78 @@ export default function Home() {
     return () => clearInterval(interval);
   }, []);
 
-  const downloadCatalog = (brand: { name: string; catalog: string }) => {
+  const downloadCatalog = async (brand: { name: string; catalog: string }) => {
     console.log(`📥 Downloading ${brand.name} catalog`);
     console.log(`📁 PDF URL: ${brand.catalog}`);
+    console.log(`🌐 Full URL: ${window.location.origin}${brand.catalog}`);
     
     try {
-      // Create download link
+      // First, test if the PDF is accessible
+      console.log(`🔍 Testing PDF accessibility for ${brand.name}...`);
+      
+      const response = await fetch(brand.catalog, { method: 'HEAD' });
+      console.log(`📊 PDF Response Status: ${response.status}`);
+      console.log(`📋 Content-Type: ${response.headers.get('content-type')}`);
+      
+      if (!response.ok) {
+        throw new Error(`PDF not accessible (Status: ${response.status})`);
+      }
+      
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('pdf')) {
+        console.warn(`⚠️ Unexpected content type: ${contentType}`);
+      }
+      
+      console.log(`✅ PDF is accessible, proceeding with download...`);
+      
+      // Method 1: Try direct download
       const link = document.createElement('a');
       link.href = brand.catalog;
       link.download = `${brand.name}-Catalog.pdf`;
       link.target = '_blank';
+      link.rel = 'noopener noreferrer';
       
       // Add to page, click, and remove
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       
-      console.log(`✅ Download started for ${brand.name}`);
+      console.log(`✅ Download initiated for ${brand.name}`);
       
-      // Show user feedback
-      alert(`${brand.name} catalog download started! The PDF will be saved to your Downloads folder.`);
+      // Show user feedback with more information
+      alert(`${brand.name} catalog download started!\n\nFile size: ${brandSizes[brand.name as keyof typeof brandSizes]?.size || 'Unknown'}\nThe PDF will be saved to your Downloads folder.\n\nIf download doesn't start, please check your browser's download settings.`);
       
     } catch (error) {
       console.error(`❌ Download failed for ${brand.name}:`, error);
-      // Fallback: try to open in new tab
+      
+      // Method 2: Try opening in new tab as fallback
       try {
-        window.open(brand.catalog, '_blank');
-        alert(`Download failed, but ${brand.name} catalog opened in new tab.`);
+        console.log(`🔄 Trying fallback method (new tab) for ${brand.name}...`);
+        const newWindow = window.open(brand.catalog, '_blank', 'noopener,noreferrer');
+        
+        if (newWindow && !newWindow.closed) {
+          console.log(`✅ Opened ${brand.name} catalog in new tab`);
+          alert(`Download failed, but ${brand.name} catalog opened in new tab.\n\nYou can save it from there using Ctrl+S or Cmd+S.`);
+        } else {
+          throw new Error('New tab blocked or failed');
+        }
+        
       } catch (fallbackError) {
-        console.error('Fallback also failed:', fallbackError);
-        alert(`Unable to download ${brand.name} catalog. Please try again or contact support.`);
+        console.error(`❌ Fallback method also failed:`, fallbackError);
+        
+        // Method 3: Provide direct URL as last resort
+        const fullUrl = `${window.location.origin}${brand.catalog}`;
+        console.log(`📄 Providing direct URL: ${fullUrl}`);
+        
+        alert(`Unable to download ${brand.name} catalog automatically.\n\nPossible solutions:\n1. Try right-clicking the download button and select "Save link as"\n2. Copy this direct link: ${fullUrl}\n3. Contact support if the issue persists\n\nError: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        
+        // Copy URL to clipboard if possible
+        try {
+          await navigator.clipboard.writeText(fullUrl);
+          console.log(`✅ URL copied to clipboard`);
+        } catch (clipboardError) {
+          console.log(`❌ Failed to copy to clipboard:`, clipboardError);
+        }
       }
     }
   };
@@ -156,15 +198,31 @@ export default function Home() {
                           </div>
                           
                           {/* Simple Download Button */}
-                          <button 
-                            className="w-full flex items-center justify-center text-white bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-700 hover:to-blue-700 transition-all duration-300 py-3 px-4 rounded-lg font-medium shadow-lg hover:shadow-xl"
-                            onClick={() => downloadCatalog(brand)}
-                          >
-                            <div className="w-5 h-5 flex items-center justify-center mr-2">
-                              <i className="ri-download-cloud-line"></i>
-                            </div>
-                            <span>Download Catalog</span>
-                          </button>
+                          <div className="space-y-2">
+                            <button 
+                              className="w-full flex items-center justify-center text-white bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-700 hover:to-blue-700 transition-all duration-300 py-3 px-4 rounded-lg font-medium shadow-lg hover:shadow-xl"
+                              onClick={() => downloadCatalog(brand)}
+                            >
+                              <div className="w-5 h-5 flex items-center justify-center mr-2">
+                                <i className="ri-download-cloud-line"></i>
+                              </div>
+                              <span>Download Catalog</span>
+                            </button>
+                            
+                            {/* Test URL Button - Small */}
+                            <button 
+                              className="w-full text-xs text-gray-600 hover:text-blue-600 transition-colors py-1"
+                              onClick={() => {
+                                const fullUrl = `${window.location.origin}${brand.catalog}`;
+                                console.log(`🔍 Testing ${brand.name} PDF URL: ${fullUrl}`);
+                                window.open(fullUrl, '_blank');
+                              }}
+                              title="Test PDF URL in new tab"
+                            >
+                              <i className="ri-external-link-line mr-1"></i>
+                              Test PDF URL
+                            </button>
+                          </div>
                           
                           <p className="text-xs text-gray-500 mt-2">
                             Click to download PDF to your device
