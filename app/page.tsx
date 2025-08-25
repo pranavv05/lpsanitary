@@ -4,12 +4,9 @@ import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
-import PDFViewerModal from '@/components/PDFViewerModal';
 
 export default function Home() {
   const [currentSlide, setCurrentSlide] = useState(0);
-  const [modalOpen, setModalOpen] = useState(false);
-  const [selectedPDF, setSelectedPDF] = useState<{ url: string; brand: string } | null>(null);
 
   // --- MODIFIED SECTION START ---
   // Updated the 'catalog' paths to point to your local files
@@ -50,75 +47,37 @@ export default function Home() {
     return () => clearInterval(interval);
   }, []);
 
-  const closeModal = () => {
-    setModalOpen(false);
-    setSelectedPDF(null);
-  };
-
-  const openCatalog = (brand: { name: string; catalog: string }) => {
-    console.log(`🎯 Opening ${brand.name} catalog`);
-    console.log(`📁 PDF URL: ${brand.catalog}`);
-    console.log(`🌐 Full URL: ${window.location.origin}${brand.catalog}`);
-    
-    setSelectedPDF({ url: brand.catalog, brand: brand.name });
-    setModalOpen(true);
-  };
-
-  const openCatalogInNewTab = (brand: { name: string; catalog: string }) => {
-    console.log(`🆕 Opening ${brand.name} catalog in new tab`);
-    console.log(`📁 PDF URL: ${brand.catalog}`);
-    
-    try {
-      // Test multiple methods for new tab opening
-      const fullUrl = brand.catalog;
-      console.log(`🔗 Trying URL: ${fullUrl}`);
-      
-      // Method 1: Direct window.open
-      const newWindow = window.open(fullUrl, '_blank', 'noopener,noreferrer');
-      if (newWindow && !newWindow.closed) {
-        console.log(`✅ New tab opened successfully for ${brand.name}`);
-        newWindow.focus();
-        return;
-      }
-      
-      console.log(`⚠️ New tab blocked, trying alternative method`);
-      
-      // Method 2: Create and click link
-      const link = document.createElement('a');
-      link.href = fullUrl;
-      link.target = '_blank';
-      link.rel = 'noopener noreferrer';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      
-      console.log(`✅ Alternative method attempted for ${brand.name}`);
-      
-    } catch (error) {
-      console.error(`❌ New tab failed for ${brand.name}:`, error);
-      // Fallback to modal
-      openCatalog(brand);
-    }
-  };
-
   const downloadCatalog = (brand: { name: string; catalog: string }) => {
     console.log(`📥 Downloading ${brand.name} catalog`);
     console.log(`📁 PDF URL: ${brand.catalog}`);
     
     try {
+      // Create download link
       const link = document.createElement('a');
       link.href = brand.catalog;
       link.download = `${brand.name}-Catalog.pdf`;
       link.target = '_blank';
+      
+      // Add to page, click, and remove
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       
-      console.log(`✅ Download initiated for ${brand.name}`);
+      console.log(`✅ Download started for ${brand.name}`);
+      
+      // Show user feedback
+      alert(`${brand.name} catalog download started! The PDF will be saved to your Downloads folder.`);
+      
     } catch (error) {
       console.error(`❌ Download failed for ${brand.name}:`, error);
-      // Fallback to opening in new tab
-      openCatalogInNewTab(brand);
+      // Fallback: try to open in new tab
+      try {
+        window.open(brand.catalog, '_blank');
+        alert(`Download failed, but ${brand.name} catalog opened in new tab.`);
+      } catch (fallbackError) {
+        console.error('Fallback also failed:', fallbackError);
+        alert(`Unable to download ${brand.name} catalog. Please try again or contact support.`);
+      }
     }
   };
 
@@ -190,76 +149,26 @@ export default function Home() {
                           <div className="text-xs text-gray-500 mb-4">
                             {brandSizes[brand.name as keyof typeof brandSizes]?.size || 'Loading...'}
                             {brandSizes[brand.name as keyof typeof brandSizes]?.warning && (
-                              <span className="text-amber-600 ml-1" title="Large file - may take time to load">
-                                <i className="ri-time-line"></i>
+                              <span className="text-amber-600 ml-1" title="Large file">
+                                <i className="ri-information-line"></i>
                               </span>
                             )}
                           </div>
                           
-                          {/* Action Buttons */}
-                          <div className="space-y-2">
-                            {/* Primary View Button */}
-                            <button 
-                              className="w-full flex items-center justify-center text-white bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 transition-all duration-300 py-2 px-4 rounded-lg font-medium"
-                              onClick={() => openCatalog(brand)}
-                            >
-                              <div className="w-4 h-4 flex items-center justify-center mr-2">
-                                <i className="ri-eye-line"></i>
-                              </div>
-                              <span className="text-sm">View Catalog</span>
-                            </button>
-                            
-                            {/* Secondary Options */}
-                            <div className="flex space-x-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                              <button 
-                                className="flex-1 flex items-center justify-center text-blue-600 hover:text-blue-700 hover:bg-blue-50 transition-colors py-1 px-2 rounded text-xs"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  openCatalogInNewTab(brand);
-                                }}
-                                title="Open in new tab"
-                              >
-                                <i className="ri-external-link-line mr-1"></i>
-                                New Tab
-                              </button>
-                              
-                              <button 
-                                className="flex-1 flex items-center justify-center text-green-600 hover:text-green-700 hover:bg-green-50 transition-colors py-1 px-2 rounded text-xs"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  downloadCatalog(brand);
-                                }}
-                                title="Download PDF"
-                              >
-                                <i className="ri-download-line mr-1"></i>
-                                Download
-                              </button>
-                              
-                              {/* Debug Test Button */}
-                              <button 
-                                className="flex-1 flex items-center justify-center text-purple-600 hover:text-purple-700 hover:bg-purple-50 transition-colors py-1 px-2 rounded text-xs"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  console.log(`🔍 Testing ${brand.name} PDF`);
-                                  console.log(`📁 URL: ${brand.catalog}`);
-                                  fetch(brand.catalog, { method: 'HEAD' })
-                                    .then(response => {
-                                      console.log(`✅ ${brand.name} PDF Status:`, response.status);
-                                      console.log(`📋 Content-Type:`, response.headers.get('content-type'));
-                                      alert(`${brand.name} PDF Test: ${response.status === 200 ? 'ACCESSIBLE' : 'NOT ACCESSIBLE'}`);
-                                    })
-                                    .catch(error => {
-                                      console.error(`❌ ${brand.name} PDF Error:`, error);
-                                      alert(`${brand.name} PDF Test: ERROR - ${error.message}`);
-                                    });
-                                }}
-                                title="Test PDF URL"
-                              >
-                                <i className="ri-bug-line mr-1"></i>
-                                Test
-                              </button>
+                          {/* Simple Download Button */}
+                          <button 
+                            className="w-full flex items-center justify-center text-white bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-700 hover:to-blue-700 transition-all duration-300 py-3 px-4 rounded-lg font-medium shadow-lg hover:shadow-xl"
+                            onClick={() => downloadCatalog(brand)}
+                          >
+                            <div className="w-5 h-5 flex items-center justify-center mr-2">
+                              <i className="ri-download-cloud-line"></i>
                             </div>
-                          </div>
+                            <span>Download Catalog</span>
+                          </button>
+                          
+                          <p className="text-xs text-gray-500 mt-2">
+                            Click to download PDF to your device
+                          </p>
                         </div>
                       ))}
                     </div>
@@ -457,16 +366,6 @@ export default function Home() {
       </section>
 
       <Footer />
-      
-      {/* PDF Viewer Modal */}
-      {selectedPDF && (
-        <PDFViewerModal
-          isOpen={modalOpen}
-          onClose={closeModal}
-          pdfUrl={selectedPDF.url}
-          brandName={selectedPDF.brand}
-        />
-      )}
     </div>
   );
 }
