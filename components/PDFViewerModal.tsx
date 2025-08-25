@@ -1,21 +1,19 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { getDownloadUrl, getWebUrl } from '@/config/cloudConfig';
+import { getDownloadUrl } from '@/config/cloudConfig';
 
 interface PDFViewerModalProps {
   isOpen: boolean;
   onClose: () => void;
   pdfUrl: string;
   brandName: string;
-  fileSize?: string;
   filename?: string; // Add filename for better download handling
 }
 
-export default function PDFViewerModal({ isOpen, onClose, pdfUrl, brandName, fileSize, filename }: PDFViewerModalProps) {
+export default function PDFViewerModal({ isOpen, onClose, pdfUrl, brandName, filename }: PDFViewerModalProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
-  const [isFullscreen, setIsFullscreen] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -87,23 +85,12 @@ export default function PDFViewerModal({ isOpen, onClose, pdfUrl, brandName, fil
     }
   };
 
-  const handleOpenInNewTab = () => {
-    // Use web URL if filename is provided (for Google Drive)
-    const openUrl = filename ? getWebUrl(filename) : pdfUrl;
-    window.open(openUrl, '_blank', 'noopener,noreferrer');
-  };
-
-  const toggleFullscreen = () => {
-    setIsFullscreen(!isFullscreen);
-  };
 
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75 backdrop-blur-sm">
-      <div className={`bg-white rounded-lg shadow-2xl transition-all duration-300 ${
-        isFullscreen ? 'w-full h-full m-0 rounded-none' : 'w-[95vw] h-[90vh] max-w-6xl'
-      }`}>
+      <div className="bg-white rounded-lg shadow-2xl transition-all duration-300 w-[95vw] h-[90vh] max-w-6xl">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-purple-50">
           <div className="flex items-center space-x-3">
@@ -112,22 +99,10 @@ export default function PDFViewerModal({ isOpen, onClose, pdfUrl, brandName, fil
             </div>
             <div>
               <h3 className="text-lg font-semibold text-gray-900">{brandName} Catalog</h3>
-              {fileSize && (
-                <p className="text-sm text-gray-500">File size: {fileSize} • Click to view instantly</p>
-              )}
             </div>
           </div>
           
           <div className="flex items-center space-x-2">
-            {/* Fullscreen Toggle */}
-            <button
-              onClick={toggleFullscreen}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-              title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
-            >
-              <i className={`ri-${isFullscreen ? 'fullscreen-exit' : 'fullscreen'}-line text-gray-600`}></i>
-            </button>
-            
             {/* Download Button */}
             <button
               onClick={handleDownload}
@@ -135,15 +110,6 @@ export default function PDFViewerModal({ isOpen, onClose, pdfUrl, brandName, fil
               title="Download PDF"
             >
               <i className="ri-download-line text-gray-600"></i>
-            </button>
-            
-            {/* Open in New Tab */}
-            <button
-              onClick={handleOpenInNewTab}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-              title="Open in New Tab"
-            >
-              <i className="ri-external-link-line text-gray-600"></i>
             </button>
             
             {/* Close Button */}
@@ -177,19 +143,12 @@ export default function PDFViewerModal({ isOpen, onClose, pdfUrl, brandName, fil
                 </div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">Unable to Display PDF</h3>
                 <p className="text-gray-600 mb-6">
-                  The PDF viewer couldn't load. This sometimes happens with Google Drive PDFs in iframes. You can:
+                  The PDF viewer couldn't load. You can download the PDF instead:
                 </p>
                 <div className="space-y-3">
                   <button
-                    onClick={handleOpenInNewTab}
-                    className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors"
-                  >
-                    <i className="ri-external-link-line mr-2"></i>
-                    Open in Google Drive
-                  </button>
-                  <button
                     onClick={handleDownload}
-                    className="w-full bg-gray-600 text-white py-2 px-4 rounded-lg hover:bg-gray-700 transition-colors"
+                    className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors"
                   >
                     <i className="ri-download-line mr-2"></i>
                     Download PDF

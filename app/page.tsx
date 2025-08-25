@@ -1,12 +1,11 @@
 'use client';
 
 import Link from 'next/link';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import PDFViewerModal from '@/components/PDFViewerModal';
-import { cloudCatalogs, CloudCatalog, getConfigStatus } from '@/config/cloudConfig';
-import { runCloudinaryTest } from '@/utils/cloudinaryTest';
+import { cloudCatalogs, CloudCatalog } from '@/config/cloudConfig';
 
 export default function Home() {
   const [currentSlide, setCurrentSlide] = useState(0);
@@ -17,27 +16,13 @@ export default function Home() {
   const [selectedPDF, setSelectedPDF] = useState<CloudCatalog | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   
-  // Get cloud storage configuration status
-  const configStatus = getConfigStatus();
-  
-  // For backward compatibility, also support local files as fallback
-  const localBrands = [
-    { name: 'Roff', catalog: '/resources/Roff-Product-Catalogue.pdf', size: '2 MB' },
-    { name: 'Jaquar', catalog: '/resources/JAQUAR_CATLOUGE.pdf', size: '60 MB', warning: true },
-    { name: 'Blues', catalog: '/resources/Blues_Catalougeupdated.pdf', size: '76 MB', warning: true },
-    { name: 'Nirali', catalog: '/resources/Nirali.pdf', size: '8 MB' },
-    { name: 'Karoma', catalog: '/resources/karoma_product_brochure_01.pdf', size: '21 MB' },
-    { name: 'Cera', catalog: '/resources/cera.pdf', size: '6 MB' },
-    { name: 'Steellera', catalog: '/resources/brochure_steelera_2023-24.pdf', size: '32 MB', warning: true },
-  ];
-  
-  // Use cloud catalogs if configured, otherwise fall back to local
-  const brands = configStatus.status === 'configured' ? cloudCatalogs : localBrands;
+  // Use cloud catalogs
+  const brands = cloudCatalogs;
   // --- END CLOUD STORAGE SECTION ---
 
-  const nextSlide = () => {
+  const nextSlide = useCallback(() => {
     setCurrentSlide((prev) => (prev + 1) % Math.ceil(brands.length / 4));
-  };
+  }, [brands.length]);
 
   const prevSlide = () => {
     setCurrentSlide((prev) => (prev - 1 + Math.ceil(brands.length / 4)) % Math.ceil(brands.length / 4));
@@ -46,24 +31,16 @@ export default function Home() {
   useEffect(() => {
     const interval = setInterval(nextSlide, 5000);
     return () => clearInterval(interval);
-  }, []);
+  }, [nextSlide]);
 
-  const viewCatalog = (brand: CloudCatalog | typeof localBrands[0]) => {
+  const viewCatalog = (brand: CloudCatalog) => {
     console.log(`👁️ Viewing ${brand.name} catalog`);
     
-    // Convert local brand format to CloudCatalog format if needed
-    const catalogData: CloudCatalog = 'cloudUrl' in brand ? brand : {
-      name: brand.name,
-      filename: brand.catalog?.split('/').pop() || '',
-      size: brand.size,
-      cloudUrl: brand.catalog || '' // Use local path as fallback
-    };
-    
-    setSelectedPDF(catalogData);
+    setSelectedPDF(brand);
     setIsModalOpen(true);
     
-    console.log(`✅ Opening ${catalogData.name} catalog in modal viewer`);
-    console.log(`📁 PDF URL: ${catalogData.cloudUrl}`);
+    console.log(`✅ Opening ${brand.name} catalog in modal viewer`);
+    console.log(`📁 PDF URL: ${brand.cloudUrl}`);
   };
   
   const closeModal = () => {
@@ -71,21 +48,7 @@ export default function Home() {
     setSelectedPDF(null);
   };
   
-  const testCloudinarySetup = async () => {
-    console.log('🔬 Testing Cloudinary configuration...');
-    try {
-      const results = await runCloudinaryTest();
-      
-      if (results && results.successfulTests === results.totalCatalogs) {
-        alert(`🎉 Cloudinary Test Successful!\n\nAll ${results.totalCatalogs} catalogs are accessible from Cloudinary.\n\nYour setup is working perfectly!`);
-      } else if (results) {
-        alert(`⚠️ Cloudinary Test Results:\n\nSuccessful: ${results.successfulTests}/${results.totalCatalogs}\nFailed: ${results.failedTests.length}\n\nCheck the browser console for detailed error information.`);
-      }
-    } catch (error) {
-      console.error('Test failed:', error);
-      alert(`❌ Test failed: ${error instanceof Error ? error.message : 'Unknown error'}\n\nCheck the browser console for more details.`);
-    }
-  };
+
 
 
   return (
@@ -152,60 +115,6 @@ export default function Home() {
                           </div>
                           <div className="text-gray-600 mb-1">Premium Quality</div>
                           
-                          {/* Storage Provider Indicator */}
-                          <div className="text-xs mb-2 flex items-center justify-center">
-                            {'storage' in brand ? (
-                              brand.storage === 'cloudinary' ? (
-                                <div className="text-blue-600 flex items-center">
-                                  <i className="ri-cloud-line mr-1"></i>
-                                  Cloudinary
-                                </div>
-                              ) : brand.storage === 's3' ? (
-                                <div className="text-orange-600 flex items-center">
-                                  <i className="ri-database-line mr-1"></i>
-                                  AWS S3
-                                </div>
-                              ) : brand.storage === 'github' ? (
-                                <div className="text-purple-600 flex items-center">
-                                  <i className="ri-github-line mr-1"></i>
-                                  GitHub
-                                </div>
-                              ) : brand.storage === 'gdrive' ? (
-                                <div className="text-green-600 flex items-center">
-                                  <i className="ri-google-line mr-1"></i>
-                                  Google Drive
-                                </div>
-                              ) : (
-                                <div className="text-gray-600 flex items-center">
-                                  <i className="ri-hard-drive-line mr-1"></i>
-                                  Local
-                                </div>
-                              )
-                            ) : (
-                              configStatus.status === 'configured' ? (
-                                <div className="text-green-600 flex items-center">
-                                  <i className="ri-cloud-line mr-1"></i>
-                                  Cloud Storage
-                                </div>
-                              ) : (
-                                <div className="text-amber-600 flex items-center">
-                                  <i className="ri-hard-drive-line mr-1"></i>
-                                  Local Files
-                                </div>
-                              )
-                            )}
-                          </div>
-                          
-                          {/* File Size Indicator */}
-                          <div className="text-xs text-gray-500 mb-4">
-                            {'size' in brand ? brand.size : 'Loading...'}
-                            {('warning' in brand && brand.warning) && (
-                              <span className="text-amber-600 ml-1" title="Large file">
-                                <i className="ri-information-line"></i>
-                              </span>
-                            )}
-                          </div>
-                          
                           {/* View Catalog Button */}
                           <div className="space-y-2">
                             <button 
@@ -217,45 +126,8 @@ export default function Home() {
                               </div>
                               <span>View Catalog</span>
                             </button>
-                            
-                            {/* Quick Preview Button - Small */}
-                            <button 
-                              className="w-full text-xs text-gray-600 hover:text-purple-600 transition-colors py-1"
-                              onClick={() => {
-                                const url = 'cloudUrl' in brand ? brand.cloudUrl : brand.catalog;
-                                const fullUrl = url?.startsWith('http') ? url : `${window.location.origin}${url}`;
-                                console.log(`🔍 Opening ${brand.name} in new tab: ${fullUrl}`);
-                                window.open(fullUrl, '_blank');
-                              }}
-                              title="Open PDF in new tab"
-                            >
-                              <i className="ri-external-link-line mr-1"></i>
-                              Open in New Tab
-                            </button>
-                            
-                            {/* Debug button - only show for first brand to avoid clutter */}
-                            {index === 0 && configStatus.status !== 'configured' && (
-                              <button 
-                                className="w-full text-xs text-amber-600 hover:text-amber-700 transition-colors py-1 mt-1"
-                                onClick={() => {
-                                  const debugUrl = '/api/debug';
-                                  console.log(`🔍 Opening debug info: ${window.location.origin}${debugUrl}`);
-                                  window.open(debugUrl, '_blank');
-                                }}
-                                title="Debug file paths in production"
-                              >
-                                <i className="ri-bug-line mr-1"></i>
-                                Debug Info
-                              </button>
-                            )}
                           </div>
-                          
-                          <p className="text-xs text-gray-500 mt-2">
-                            {configStatus.status === 'configured' 
-                              ? 'Click to view PDF instantly in modal viewer' 
-                              : 'Click to view PDF (local files)'
-                            }
-                          </p>
+
                         </div>
                       ))}
                     </div>
@@ -461,84 +333,8 @@ export default function Home() {
           onClose={closeModal}
           pdfUrl={selectedPDF.cloudUrl}
           brandName={selectedPDF.name}
-          fileSize={selectedPDF.size}
           filename={selectedPDF.filename}
         />
-      )}
-      
-      {/* Hybrid Storage Configuration Notification */}
-      {configStatus.status === 'needs-setup' && (
-        <div className="fixed bottom-4 right-4 bg-blue-50 border border-blue-200 rounded-lg p-4 shadow-lg max-w-sm z-40">
-          <div className="flex items-start space-x-3">
-            <div className="flex-shrink-0">
-              <i className="ri-cloud-line text-blue-600 text-xl"></i>
-            </div>
-            <div>
-              <h4 className="text-sm font-semibold text-blue-800 mb-1">
-                Setup Hybrid Storage
-              </h4>
-              <p className="text-xs text-blue-700 mb-2">
-                {configStatus.message}
-              </p>
-              <p className="text-xs text-blue-600 mb-3">
-                Small files → Cloudinary (free) • Large files → AWS S3
-              </p>
-              <div className="space-y-2">
-                <button 
-                  onClick={() => {
-                    window.open('/HYBRID_STORAGE_SETUP.md', '_blank');
-                  }}
-                  className="text-xs bg-blue-600 text-white px-2 py-1 rounded hover:bg-blue-700 transition-colors w-full"
-                >
-                  📝 Setup Guide
-                </button>
-                <div className="grid grid-cols-2 gap-1">
-                  <button 
-                    onClick={() => {
-                      window.open('https://cloudinary.com/users/register/free', '_blank');
-                    }}
-                    className="text-xs bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600 transition-colors"
-                  >
-                    ☁️ Cloudinary
-                  </button>
-                  <button 
-                    onClick={() => {
-                      window.open('https://aws.amazon.com/s3/', '_blank');
-                    }}
-                    className="text-xs bg-orange-500 text-white px-2 py-1 rounded hover:bg-orange-600 transition-colors"
-                  >
-                    🌍 AWS S3
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-      
-      {/* Hybrid Storage Active Notification */}
-      {configStatus.status === 'configured' && (
-        <div className="fixed bottom-4 right-4 bg-green-50 border border-green-200 rounded-lg p-4 shadow-lg max-w-sm z-40">
-          <div className="flex items-start space-x-3">
-            <div className="flex-shrink-0">
-              <i className="ri-cloud-check-line text-green-600 text-xl"></i>
-            </div>
-            <div>
-              <h4 className="text-sm font-semibold text-green-800 mb-1">
-                Hybrid Storage Active
-              </h4>
-              <p className="text-xs text-green-700 mb-2">
-                Small files: Cloudinary • Large files: S3
-              </p>
-              <button 
-                onClick={testCloudinarySetup}
-                className="text-xs bg-green-600 text-white px-2 py-1 rounded hover:bg-green-700 transition-colors w-full"
-              >
-                🗺 Test All URLs
-              </button>
-            </div>
-          </div>
-        </div>
       )}
     </div>
   );
