@@ -52,11 +52,32 @@ export default function Home() {
     console.log(`📁 PDF URL: ${brand.catalog}`);
     console.log(`🌐 Full URL: ${window.location.origin}${brand.catalog}`);
     
+    // Extract filename from catalog path
+    const filename = brand.catalog.split('/').pop();
+    const apiUrl = `/api/pdf/${filename}`;
+    let useApiRoute = false; // Initialize outside try block
+    
     try {
-      // First, test if the PDF is accessible
-      console.log(`🔍 Testing PDF accessibility for ${brand.name}...`);
+      // Method 1: Try API route first (guaranteed headers in production)
+      console.log(`🔍 Testing API route for ${brand.name}: ${apiUrl}...`);
       
-      const response = await fetch(brand.catalog, { 
+      const apiResponse = await fetch(apiUrl, { 
+        method: 'HEAD',
+        headers: {
+          'Accept': 'application/pdf,*/*',
+          'Cache-Control': 'no-cache'
+        }
+      });
+      
+      useApiRoute = apiResponse.ok;
+      console.log(`📊 API Route Status: ${apiResponse.status} - ${useApiRoute ? 'Available' : 'Fallback to static'}`);
+      
+      // Choose the best URL based on availability
+      const pdfUrl = useApiRoute ? apiUrl : brand.catalog;
+      console.log(`📦 Using ${useApiRoute ? 'API route' : 'static file'}: ${pdfUrl}`);
+      
+      // Test if the PDF is accessible
+      const response = await fetch(pdfUrl, { 
         method: 'HEAD',
         headers: {
           'Accept': 'application/pdf,*/*',
@@ -72,10 +93,10 @@ export default function Home() {
         throw new Error(`PDF not accessible (Status: ${response.status})`);
       }
       
-      // Method 1: Try blob-based download for better integrity
+      // Method 2: Try blob-based download for better integrity
       console.log(`📦 Downloading PDF as blob for ${brand.name}...`);
       
-      const pdfResponse = await fetch(brand.catalog, {
+      const pdfResponse = await fetch(pdfUrl, {
         headers: {
           'Accept': 'application/pdf,*/*',
           'Cache-Control': 'no-cache'
@@ -117,17 +138,20 @@ export default function Home() {
       console.log(`✅ Blob download initiated for ${brand.name}`);
       
       // Show user feedback with more information
-      alert(`${brand.name} catalog download started!\n\nFile size: ${brandSizes[brand.name as keyof typeof brandSizes]?.size || 'Unknown'}\nDownloaded as: ${brand.name}-Catalog.pdf\n\nThe PDF will be saved to your Downloads folder.\n\nThis method should prevent file corruption.`);
+      alert(`${brand.name} catalog download started!\n\nFile size: ${brandSizes[brand.name as keyof typeof brandSizes]?.size || 'Unknown'}\nDownloaded as: ${brand.name}-Catalog.pdf\n\nThe PDF will be saved to your Downloads folder.\n\nUsing ${useApiRoute ? 'API route' : 'static file'} method to prevent corruption.`);
       
     } catch (error) {
-      console.error(`❌ Blob download failed for ${brand.name}:`, error);
+      console.error(`❌ Primary download failed for ${brand.name}:`, error);
       
       // Method 2: Fallback to direct download
       try {
         console.log(`🔄 Trying direct download fallback for ${brand.name}...`);
         
+        // Try API route first, then static file
+        const fallbackUrl = useApiRoute ? apiUrl : brand.catalog;
+        
         const link = document.createElement('a');
-        link.href = brand.catalog;
+        link.href = fallbackUrl;
         link.download = `${brand.name}-Catalog.pdf`;
         link.target = '_blank';
         link.rel = 'noopener noreferrer';
@@ -137,7 +161,7 @@ export default function Home() {
         document.body.removeChild(link);
         
         console.log(`✅ Direct download attempted for ${brand.name}`);
-        alert(`${brand.name} catalog download started (direct method).\n\nIf you get a "file damaged" error, try the "Test PDF URL" button below to open it in your browser first.`);
+        alert(`${brand.name} catalog download started (direct method).\n\nUsing ${useApiRoute ? 'API route' : 'static file'} for better reliability.\n\nIf you get a "file damaged" error, try the "Test PDF URL" button below.`);
         
       } catch (directError) {
         console.error(`❌ Direct download also failed:`, directError);
@@ -145,7 +169,8 @@ export default function Home() {
         // Method 3: Try opening in new tab as fallback
         try {
           console.log(`🔄 Trying new tab fallback for ${brand.name}...`);
-          const newWindow = window.open(brand.catalog, '_blank', 'noopener,noreferrer');
+          const fallbackUrl = useApiRoute ? apiUrl : brand.catalog;
+          const newWindow = window.open(fallbackUrl, '_blank', 'noopener,noreferrer');
           
           if (newWindow && !newWindow.closed) {
             console.log(`✅ Opened ${brand.name} catalog in new tab`);
@@ -157,16 +182,17 @@ export default function Home() {
         } catch (fallbackError) {
           console.error(`❌ All methods failed:`, fallbackError);
           
-          // Method 4: Provide direct URL as last resort
-          const fullUrl = `${window.location.origin}${brand.catalog}`;
-          console.log(`📄 Providing direct URL: ${fullUrl}`);
+          // Method 4: Provide direct URLs as last resort
+          const staticUrl = `${window.location.origin}${brand.catalog}`;
+          const apiUrlFull = `${window.location.origin}${apiUrl}`;
+          console.log(`📄 Providing direct URLs - API: ${apiUrlFull}, Static: ${staticUrl}`);
           
-          alert(`Unable to download ${brand.name} catalog automatically.\n\nPlease try these solutions:\n\n1. Copy this direct link: ${fullUrl}\n2. Right-click the "Download Catalog" button and select "Save link as"\n3. Try the "Test PDF URL" button to open in browser\n4. Contact support if the issue persists\n\nError: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          alert(`Unable to download ${brand.name} catalog automatically.\n\nPlease try these solutions:\n\n1. API Route: ${apiUrlFull}\n2. Static File: ${staticUrl}\n3. Right-click the "Download Catalog" button and select "Save link as"\n4. Try the "Test PDF URL" button to open in browser\n5. Contact support if the issue persists\n\nError: ${error instanceof Error ? error.message : 'Unknown error'}`);
           
-          // Copy URL to clipboard if possible
+          // Copy URLs to clipboard if possible
           try {
-            await navigator.clipboard.writeText(fullUrl);
-            console.log(`✅ URL copied to clipboard`);
+            await navigator.clipboard.writeText(`API Route: ${apiUrlFull}\nStatic File: ${staticUrl}`);
+            console.log(`✅ URLs copied to clipboard`);
           } catch (clipboardError) {
             console.log(`❌ Failed to copy to clipboard:`, clipboardError);
           }
@@ -264,7 +290,23 @@ export default function Home() {
                             {/* Test URL Button - Small */}
                             <button 
                               className="w-full text-xs text-gray-600 hover:text-blue-600 transition-colors py-1"
-                              onClick={() => {
+                              onClick={async () => {
+                                const filename = brand.catalog.split('/').pop();
+                                const apiUrl = `/api/pdf/${filename}`;
+                                
+                                // Test API route first
+                                try {
+                                  const apiResponse = await fetch(apiUrl, { method: 'HEAD' });
+                                  if (apiResponse.ok) {
+                                    console.log(`🔍 Testing ${brand.name} API URL: ${window.location.origin}${apiUrl}`);
+                                    window.open(apiUrl, '_blank');
+                                    return;
+                                  }
+                                } catch (e) {
+                                  console.log('API route not available, using static file');
+                                }
+                                
+                                // Fallback to static file
                                 const fullUrl = `${window.location.origin}${brand.catalog}`;
                                 console.log(`🔍 Testing ${brand.name} PDF URL: ${fullUrl}`);
                                 window.open(fullUrl, '_blank');

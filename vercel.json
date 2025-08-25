@@ -1,0 +1,66 @@
+{
+  "functions": {
+    "app/**": {
+      "maxDuration": 30
+    }
+  },
+  "headers": [
+    {
+      "source": "/resources/(.*)\\.pdf",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "application/pdf"
+        },
+        {
+          "key": "Content-Disposition",
+          "value": "inline; filename=\"catalog.pdf\""
+        },
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        },
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "*"
+        },
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "Accept-Ranges",
+          "value": "bytes"
+        },
+        {
+          "key": "Content-Encoding",
+          "value": "identity"
+        },
+        {
+          "key": "Content-Transfer-Encoding",
+          "value": "binary"
+        },
+        {
+          "key": "X-Content-Encoding-Override",
+          "value": "none"
+        },
+        {
+          "key": "X-Compression-Override",
+          "value": "false"
+        }
+      ]
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/resources/(.*)",
+      "destination": "/resources/$1"
+    }
+  ],
+  "public": true,
+  "cleanUrls": false,
+  "trailingSlash": false,
+  "github": {
+    "silent": true
+  }
+}
