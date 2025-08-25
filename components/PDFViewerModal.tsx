@@ -14,14 +14,19 @@ export default function PDFViewerModal({ isOpen, onClose, pdfUrl, brandName }: P
   const [error, setError] = useState<string | null>(null);
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [estimatedSize, setEstimatedSize] = useState<string>('');
+  const [retryCount, setRetryCount] = useState(0);
+  const [useAlternativeViewer, setUseAlternativeViewer] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const progressRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     if (isOpen) {
       setLoading(true);
       setError(null);
       setLoadingProgress(0);
+      setRetryCount(0);
+      setUseAlternativeViewer(false);
       
       // Estimate file size based on brand name
       const sizeEstimates: { [key: string]: string } = {
@@ -37,50 +42,82 @@ export default function PDFViewerModal({ isOpen, onClose, pdfUrl, brandName }: P
       
       setEstimatedSize(sizeEstimates[brandName] || 'Loading...');
       
-      // Set a timeout for very large files (30 seconds)
+      // Set a timeout based on estimated file size
+      const timeoutDuration = brandName === 'Blues' || brandName === 'Jaquar' || brandName === 'JAQUAR' ? 45000 : 30000;
       timeoutRef.current = setTimeout(() => {
         if (loading) {
-          setError(`Large file taking longer than expected. You can still open it in a new tab or download it directly.`);
+          console.warn(`PDF loading timeout for ${brandName}`);
+          setError(`The ${brandName} catalog is taking longer than expected to load. This might be due to the large file size (${sizeEstimates[brandName]?.split(' - ')[0] || 'unknown'}). You can try the alternative options below.`);
           setLoading(false);
         }
-      }, 30000);
+      }, timeoutDuration);
       
       // Simulate loading progress for user feedback
-      const progressInterval = setInterval(() => {
+      progressRef.current = setInterval(() => {
         setLoadingProgress(prev => {
-          if (prev >= 90) return prev;
-          return prev + Math.random() * 15;
+          if (prev >= 85) return prev;
+          // Slower progress for larger files
+          const increment = brandName === 'Blues' || brandName === 'Jaquar' ? Math.random() * 5 : Math.random() * 10;
+          return Math.min(prev + increment, 85);
         });
-      }, 1000);
+      }, 1500);
       
       return () => {
-        clearTimeout(timeoutRef.current!);
-        clearInterval(progressInterval);
+        if (timeoutRef.current) clearTimeout(timeoutRef.current);
+        if (progressRef.current) clearInterval(progressRef.current);
       };
     }
   }, [isOpen, pdfUrl, brandName, loading]);
 
   const handleIframeLoad = () => {
+    console.log(`PDF loaded successfully for ${brandName}`);
     setLoading(false);
     setError(null);
     setLoadingProgress(100);
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
     }
+    if (progressRef.current) {
+      clearInterval(progressRef.current);
+    }
   };
 
   const handleIframeError = () => {
+    console.error(`PDF loading error for ${brandName}`);
     setLoading(false);
-    setError('PDF viewer not available. Use the buttons below to open or download the catalog.');
+    
+    if (retryCount < 2 && !useAlternativeViewer) {
+      // Try alternative viewer before showing error
+      setRetryCount(prev => prev + 1);
+      setUseAlternativeViewer(true);
+      setError(null);
+      setLoading(true);
+      setLoadingProgress(0);
+      
+      console.log(`Retrying with alternative viewer for ${brandName} (attempt ${retryCount + 1})`);
+    } else {
+      setError(`Unable to display the ${brandName} catalog in the browser viewer. This might be due to browser compatibility or file size. Please use the options below to access the catalog.`);
+    }
   };
 
   const openInNewTab = () => {
     try {
-      const newWindow = window.open(pdfUrl, '_blank', 'noopener,noreferrer');
+      console.log(`Opening ${brandName} catalog in new tab`);
+      // Try enhanced new tab opening
+      const newWindow = window.open('', '_blank', 'noopener,noreferrer,width=1200,height=800,scrollbars=yes,toolbar=yes,menubar=yes');
       if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
         // If popup is blocked, try direct navigation
-        window.location.href = pdfUrl;
+        console.warn('Popup blocked, trying direct navigation');
+        window.open(pdfUrl, '_blank');
+        return;
       }
+      
+      // Set the URL after opening to avoid some popup blockers
+      newWindow.location.href = pdfUrl;
+      
+      // Focus the new window
+      newWindow.focus();
+      
     } catch (error) {
       console.error('Failed to open in new tab:', error);
       // Fallback to download
@@ -90,17 +127,52 @@ export default function PDFViewerModal({ isOpen, onClose, pdfUrl, brandName }: P
 
   const downloadPDF = () => {
     try {
+      console.log(`Downloading ${brandName} catalog`);
       const link = document.createElement('a');
       link.href = pdfUrl;
       link.download = `${brandName}-Catalog.pdf`;
       link.target = '_blank';
       link.rel = 'noopener noreferrer';
+      
+      // Ensure the link is not visible
+      link.style.display = 'none';
+      
       document.body.appendChild(link);
       link.click();
-      document.body.removeChild(link);
+      
+      // Clean up after a brief delay
+      setTimeout(() => {
+        try {
+          document.body.removeChild(link);
+        } catch (e) {
+          // Ignore if already removed
+        }
+      }, 100);
+      
+      // Show success message briefly
+      setError(null);
+      
     } catch (error) {
       console.error('Download failed:', error);
-      alert('Unable to download. Please try opening in a new tab.');
+      // Fallback: try opening in same tab
+      try {
+        window.location.href = pdfUrl;
+      } catch (navError) {
+        alert(`Unable to download ${brandName} catalog. Please try opening in a new tab or contact support.`);
+      }
+    }
+  };
+  
+  const retryLoading = () => {
+    setError(null);
+    setLoading(true);
+    setLoadingProgress(0);
+    setRetryCount(0);
+    setUseAlternativeViewer(false);
+    
+    // Reload the iframe
+    if (iframeRef.current) {
+      iframeRef.current.src = iframeRef.current.src;
     }
   };
 
@@ -160,18 +232,27 @@ export default function PDFViewerModal({ isOpen, onClose, pdfUrl, brandName }: P
                 
                 <div className="space-y-2">
                   <p className="text-gray-500 text-xs">Taking too long?</p>
-                  <div className="space-x-2">
+                  <div className="space-x-2 space-y-1">
                     <button
                       onClick={openInNewTab}
                       className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
                     >
+                      <i className="ri-external-link-line mr-1"></i>
                       Open in New Tab
                     </button>
                     <button
                       onClick={downloadPDF}
                       className="px-3 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
                     >
+                      <i className="ri-download-line mr-1"></i>
                       Download Instead
+                    </button>
+                    <button
+                      onClick={() => setUseAlternativeViewer(!useAlternativeViewer)}
+                      className="px-3 py-1 text-xs bg-purple-600 text-white rounded hover:bg-purple-700 transition-colors"
+                    >
+                      <i className="ri-refresh-line mr-1"></i>
+                      Try Alternative View
                     </button>
                   </div>
                 </div>
@@ -181,26 +262,41 @@ export default function PDFViewerModal({ isOpen, onClose, pdfUrl, brandName }: P
 
           {error && (
             <div className="absolute inset-0 flex items-center justify-center bg-gray-100 z-10">
-              <div className="text-center p-8">
+              <div className="text-center p-8 max-w-md">
                 <div className="text-yellow-500 text-4xl mb-4">
                   <i className="ri-information-line"></i>
                 </div>
-                <p className="text-gray-700 mb-4">{error}</p>
-                <div className="space-x-4">
+                <h3 className="text-lg font-semibold text-gray-800 mb-2">
+                  {brandName} Catalog Viewing Issue
+                </h3>
+                <p className="text-gray-700 text-sm mb-4">{error}</p>
+                <div className="space-y-3">
+                  <div className="flex flex-wrap gap-2 justify-center">
+                    <button
+                      onClick={openInNewTab}
+                      className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors text-sm"
+                    >
+                      <i className="ri-external-link-line mr-2"></i>
+                      Open in New Tab
+                    </button>
+                    <button
+                      onClick={downloadPDF}
+                      className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors text-sm"
+                    >
+                      <i className="ri-download-line mr-2"></i>
+                      Download PDF
+                    </button>
+                  </div>
                   <button
-                    onClick={openInNewTab}
-                    className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                    onClick={retryLoading}
+                    className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 transition-colors text-sm"
                   >
-                    <i className="ri-external-link-line mr-2"></i>
-                    Open in New Tab
+                    <i className="ri-refresh-line mr-2"></i>
+                    Retry Loading
                   </button>
-                  <button
-                    onClick={downloadPDF}
-                    className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
-                  >
-                    <i className="ri-download-line mr-2"></i>
-                    Download PDF
-                  </button>
+                  <p className="text-xs text-gray-500 mt-2">
+                    File size: {estimatedSize.split(' - ')[0] || 'Unknown'}
+                  </p>
                 </div>
               </div>
             </div>
@@ -208,12 +304,18 @@ export default function PDFViewerModal({ isOpen, onClose, pdfUrl, brandName }: P
 
           {/* Try multiple iframe approaches for better compatibility */}
           <iframe
-            src={`${pdfUrl}#toolbar=1&navpanes=1&scrollbar=1&page=1&view=FitH`}
+            ref={iframeRef}
+            src={useAlternativeViewer ? 
+              `${pdfUrl}#toolbar=0&navpanes=0&scrollbar=1&page=1&view=FitH` : 
+              `${pdfUrl}#toolbar=1&navpanes=1&scrollbar=1&page=1&view=FitH&zoom=page-fit`
+            }
             className="w-full h-full border-none"
             title={`${brandName} Product Catalog`}
             onLoad={handleIframeLoad}
             onError={handleIframeError}
             style={{ minHeight: '600px' }}
+            allow="fullscreen"
+            loading="eager"
           />
         </div>
       </div>

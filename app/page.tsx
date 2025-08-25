@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import PDFViewerModal from '@/components/PDFViewerModal';
-import { openPDFCatalog } from '@/utils/pdfHandler';
+import { openPDFCatalog, downloadPDFCatalog } from '@/utils/pdfHandler';
 
 export default function Home() {
   const [currentSlide, setCurrentSlide] = useState(0);
@@ -52,31 +52,42 @@ export default function Home() {
     return () => clearInterval(interval);
   }, []);
 
+  const downloadCatalog = (brand: { name: string; catalog: string }) => {
+    console.log(`User requested download for ${brand.name} catalog`);
+    downloadPDFCatalog(brand.catalog, brand.name);
+  };
+
   const openCatalog = async (brand: { name: string; catalog: string }) => {
-    // Try the robust PDF handler first for direct browser viewing
+    console.log(`User clicked on ${brand.name} catalog`);
+    
     try {
       await openPDFCatalog(brand.catalog, brand.name, {
-        onLoading: (loading) => setLoadingCatalog(loading ? brand.name : null),
+        onLoading: (loading) => {
+          setLoadingCatalog(loading ? brand.name : null);
+          if (loading) {
+            console.log(`Loading ${brand.name} catalog...`);
+          }
+        },
         onSuccess: () => {
-          console.log(`Successfully opened ${brand.name} catalog in browser`);
+          console.log(`Successfully opened ${brand.name} catalog`);
+          setLoadingCatalog(null);
         },
         onError: (error) => {
-          // If direct opening fails or returns 'SHOW_MODAL', use modal viewer
-          if (error === 'SHOW_MODAL' || error.includes('failed')) {
-            console.log(`Opening ${brand.name} catalog in modal viewer`);
-            setSelectedPDF({ url: brand.catalog, brand: brand.name });
-            setModalOpen(true);
-          } else {
-            console.warn(`PDF handler error for ${brand.name}:`, error);
-            // Still show modal as fallback
-            setSelectedPDF({ url: brand.catalog, brand: brand.name });
-            setModalOpen(true);
-          }
+          console.log(`PDF handler returned: ${error} for ${brand.name}`);
+          setLoadingCatalog(null);
+          
+          // Always show modal as fallback for any error
+          console.log(`Opening ${brand.name} catalog in modal viewer`);
+          setSelectedPDF({ url: brand.catalog, brand: brand.name });
+          setModalOpen(true);
         }
       });
     } catch (error) {
-      console.log(`Opening ${brand.name} catalog in modal viewer as fallback`);
-      // Always fall back to modal viewer for inline viewing
+      console.error(`Unexpected error opening ${brand.name} catalog:`, error);
+      setLoadingCatalog(null);
+      
+      // Always fall back to modal viewer
+      console.log(`Opening ${brand.name} catalog in modal viewer as final fallback`);
       setSelectedPDF({ url: brand.catalog, brand: brand.name });
       setModalOpen(true);
     }
@@ -141,13 +152,15 @@ export default function Home() {
                   <div key={slideIndex} className="w-full flex-shrink-0">
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
                       {brands.slice(slideIndex * 4, slideIndex * 4 + 4).map((brand, index) => (
-                        <div
+                        <div 
                           key={index}
                           className="bg-white rounded-xl p-8 text-center shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-2 hover:scale-105 cursor-pointer animate-fade-in-up group"
-                          onClick={() => openCatalog(brand)}
                           style={{animationDelay: `${index * 100}ms`}}
                         >
-                          <div className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-2 group-hover:from-purple-600 group-hover:to-pink-600 transition-all duration-300">
+                          <div 
+                            className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-2 group-hover:from-purple-600 group-hover:to-pink-600 transition-all duration-300"
+                            onClick={() => openCatalog(brand)}
+                          >
                             {brand.name}
                           </div>
                           <div className="text-gray-600 mb-1">Premium Quality</div>
@@ -162,20 +175,43 @@ export default function Home() {
                             )}
                           </div>
                           
-                          <div className="flex items-center justify-center text-purple-600 hover:text-purple-700 transition-colors">
-                            {loadingCatalog === brand.name ? (
-                              <>
-                                <div className="w-4 h-4 border-2 border-purple-600 border-t-transparent rounded-full animate-spin mr-2"></div>
-                                <span className="text-sm font-medium">Opening...</span>
-                              </>
-                            ) : (
-                              <>
-                                <div className="w-4 h-4 flex items-center justify-center mr-2">
-                                  <i className="ri-eye-line"></i>
-                                </div>
-                                <span className="text-sm font-medium">View Catalog</span>
-                              </>
-                            )}
+                          {/* Action Buttons */}
+                          <div className="space-y-2">
+                            <div 
+                              className="flex items-center justify-center text-purple-600 hover:text-purple-700 transition-colors group-hover:scale-105 cursor-pointer"
+                              onClick={() => openCatalog(brand)}
+                            >
+                              {loadingCatalog === brand.name ? (
+                                <>
+                                  <div className="w-4 h-4 border-2 border-purple-600 border-t-transparent rounded-full animate-spin mr-2"></div>
+                                  <span className="text-sm font-medium">Opening...</span>
+                                </>
+                              ) : (
+                                <>
+                                  <div className="w-4 h-4 flex items-center justify-center mr-2">
+                                    <i className="ri-eye-line"></i>
+                                  </div>
+                                  <span className="text-sm font-medium">View Catalog</span>
+                                  <div className="w-4 h-4 flex items-center justify-center ml-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <i className="ri-external-link-line text-xs"></i>
+                                  </div>
+                                </>
+                              )}
+                            </div>
+                            
+                            {/* Download Button */}
+                            <div 
+                              className="flex items-center justify-center text-green-600 hover:text-green-700 transition-colors cursor-pointer text-xs opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                downloadCatalog(brand);
+                              }}
+                            >
+                              <div className="w-3 h-3 flex items-center justify-center mr-1">
+                                <i className="ri-download-line"></i>
+                              </div>
+                              <span className="font-medium">Download PDF</span>
+                            </div>
                           </div>
                         </div>
                       ))}
