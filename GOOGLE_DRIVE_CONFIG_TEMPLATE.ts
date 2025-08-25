@@ -34,9 +34,22 @@ const GOOGLE_DRIVE_FILE_IDS: Record<string, string> = {
   'Blues_Catalougeupdated.pdf': 'YOUR_BLUES_FILE_ID_HERE'       // 👈 REPLACE
 };
 
+// 🎯 GET GOOGLE DRIVE URLS
+const getGoogleDriveUrls = (fileId: string) => {
+  return {
+    // For viewing in modal (this is what users will see)
+    viewerUrl: `https://drive.google.com/file/d/${fileId}/preview`,
+    // For downloading if needed
+    downloadUrl: `https://drive.google.com/uc?export=download&id=${fileId}`,
+    // For opening in Google Drive web interface
+    webUrl: `https://drive.google.com/file/d/${fileId}/view`
+  };
+};
+
 const CURRENT_CLOUD_CONFIG = {
   gdrive: {
-    baseUrl: 'https://drive.google.com/uc?export=download&id='
+    viewerUrl: 'https://drive.google.com/file/d/',
+    downloadUrl: 'https://drive.google.com/uc?export=download&id='
   },
   provider: 'gdrive-hybrid' as const // Perfect for students!
 };
@@ -47,28 +60,28 @@ export const cloudCatalogs: CloudCatalog[] = [
     name: 'Roff',
     filename: 'Roff-Product-Catalogue.pdf',
     size: '2 MB',
-    cloudUrl: `${CURRENT_CLOUD_CONFIG.gdrive.baseUrl}${GOOGLE_DRIVE_FILE_IDS['Roff-Product-Catalogue.pdf']}`,
+    cloudUrl: getGoogleDriveUrls(GOOGLE_DRIVE_FILE_IDS['Roff-Product-Catalogue.pdf']).viewerUrl,
     storage: 'gdrive'
   },
   {
     name: 'Cera',
     filename: 'cera.pdf',
     size: '6 MB',
-    cloudUrl: `${CURRENT_CLOUD_CONFIG.gdrive.baseUrl}${GOOGLE_DRIVE_FILE_IDS['cera.pdf']}`,
+    cloudUrl: getGoogleDriveUrls(GOOGLE_DRIVE_FILE_IDS['cera.pdf']).viewerUrl,
     storage: 'gdrive'
   },
   {
     name: 'Nirali',
     filename: 'Nirali.pdf',
     size: '8 MB',
-    cloudUrl: `${CURRENT_CLOUD_CONFIG.gdrive.baseUrl}${GOOGLE_DRIVE_FILE_IDS['Nirali.pdf']}`,
+    cloudUrl: getGoogleDriveUrls(GOOGLE_DRIVE_FILE_IDS['Nirali.pdf']).viewerUrl,
     storage: 'gdrive'
   },
   {
     name: 'Karoma',
     filename: 'karoma_product_brochure_01.pdf',
     size: '21 MB',
-    cloudUrl: `${CURRENT_CLOUD_CONFIG.gdrive.baseUrl}${GOOGLE_DRIVE_FILE_IDS['karoma_product_brochure_01.pdf']}`,
+    cloudUrl: getGoogleDriveUrls(GOOGLE_DRIVE_FILE_IDS['karoma_product_brochure_01.pdf']).viewerUrl,
     storage: 'gdrive',
     warning: true
   },
@@ -76,7 +89,7 @@ export const cloudCatalogs: CloudCatalog[] = [
     name: 'Steellera',
     filename: 'brochure_steelera_2023-24.pdf',
     size: '32 MB',
-    cloudUrl: `${CURRENT_CLOUD_CONFIG.gdrive.baseUrl}${GOOGLE_DRIVE_FILE_IDS['brochure_steelera_2023-24.pdf']}`,
+    cloudUrl: getGoogleDriveUrls(GOOGLE_DRIVE_FILE_IDS['brochure_steelera_2023-24.pdf']).viewerUrl,
     storage: 'gdrive',
     warning: true
   },
@@ -84,7 +97,7 @@ export const cloudCatalogs: CloudCatalog[] = [
     name: 'Jaquar',
     filename: 'JAQUAR_CATLOUGE.pdf',
     size: '60 MB',
-    cloudUrl: `${CURRENT_CLOUD_CONFIG.gdrive.baseUrl}${GOOGLE_DRIVE_FILE_IDS['JAQUAR_CATLOUGE.pdf']}`,
+    cloudUrl: getGoogleDriveUrls(GOOGLE_DRIVE_FILE_IDS['JAQUAR_CATLOUGE.pdf']).viewerUrl,
     storage: 'gdrive',
     warning: true
   },
@@ -92,7 +105,7 @@ export const cloudCatalogs: CloudCatalog[] = [
     name: 'Blues',
     filename: 'Blues_Catalougeupdated.pdf',
     size: '76 MB',
-    cloudUrl: `${CURRENT_CLOUD_CONFIG.gdrive.baseUrl}${GOOGLE_DRIVE_FILE_IDS['Blues_Catalougeupdated.pdf']}`,
+    cloudUrl: getGoogleDriveUrls(GOOGLE_DRIVE_FILE_IDS['Blues_Catalougeupdated.pdf']).viewerUrl,
     storage: 'gdrive',
     warning: true
   }

@@ -1,4 +1,4 @@
-import { CloudCatalog, cloudCatalogs, addNewCatalog, getConfigStatus } from './cloudConfig';
+import { CloudCatalog, cloudCatalogs, addNewCatalog, getConfigStatus } from '../config/cloudConfig';
 
 /**
  * Utility functions for managing cloud storage catalogs
