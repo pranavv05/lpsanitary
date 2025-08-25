@@ -2,11 +2,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import { readFile } from 'fs/promises';
 import { join } from 'path';
 
+interface RouteParams {
+  params: Promise<{ filename: string }>;
+}
+
 export async function GET(
   request: NextRequest,
-  { params }: { params: { filename: string } }
+  context: RouteParams
 ) {
   try {
+    const params = await context.params;
     const filename = params.filename;
     
     // Validate PDF file extension
