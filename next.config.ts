@@ -7,7 +7,9 @@ const nextConfig: NextConfig = {
   typescript: {
     // ignoreBuildErrors: true,
   },
-  compress: true, // Enable gzip compression
+  // Disable compression for PDF files to prevent corruption
+  compress: false,
+  
   async headers() {
     return [
       {
@@ -19,7 +21,7 @@ const nextConfig: NextConfig = {
           },
           {
             key: 'Content-Disposition',
-            value: 'inline',
+            value: 'inline; filename="catalog.pdf"',
           },
           {
             key: 'Cache-Control',
@@ -29,18 +31,45 @@ const nextConfig: NextConfig = {
             key: 'Access-Control-Allow-Origin',
             value: '*',
           },
-          // Add performance hints for large files
           {
             key: 'X-Content-Type-Options',
             value: 'nosniff',
           },
           {
             key: 'Accept-Ranges',
-            value: 'bytes', // Enable partial content requests
+            value: 'bytes',
+          },
+          // Prevent any encoding that might corrupt PDFs
+          {
+            key: 'Content-Encoding',
+            value: 'identity',
+          },
+          // Ensure binary transfer
+          {
+            key: 'Content-Transfer-Encoding',
+            value: 'binary',
+          },
+        ],
+      },
+      // Also handle requests without extension
+      {
+        source: '/resources/:path*',
+        headers: [
+          {
+            key: 'X-Content-Type-Options',
+            value: 'nosniff',
           },
         ],
       },
     ];
+  },
+  
+  // Ensure static files are served properly
+  trailingSlash: false,
+  
+  // Optimize for better file serving
+  experimental: {
+    optimizeCss: false, // Disable CSS optimization that might interfere
   },
 };
 

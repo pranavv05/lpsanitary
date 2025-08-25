@@ -56,24 +56,49 @@ export default function Home() {
       // First, test if the PDF is accessible
       console.log(`🔍 Testing PDF accessibility for ${brand.name}...`);
       
-      const response = await fetch(brand.catalog, { method: 'HEAD' });
+      const response = await fetch(brand.catalog, { 
+        method: 'HEAD',
+        headers: {
+          'Accept': 'application/pdf,*/*',
+          'Cache-Control': 'no-cache'
+        }
+      });
+      
       console.log(`📊 PDF Response Status: ${response.status}`);
       console.log(`📋 Content-Type: ${response.headers.get('content-type')}`);
+      console.log(`💾 Content-Length: ${response.headers.get('content-length')}`);
       
       if (!response.ok) {
         throw new Error(`PDF not accessible (Status: ${response.status})`);
       }
       
-      const contentType = response.headers.get('content-type');
-      if (!contentType || !contentType.includes('pdf')) {
-        console.warn(`⚠️ Unexpected content type: ${contentType}`);
+      // Method 1: Try blob-based download for better integrity
+      console.log(`📦 Downloading PDF as blob for ${brand.name}...`);
+      
+      const pdfResponse = await fetch(brand.catalog, {
+        headers: {
+          'Accept': 'application/pdf,*/*',
+          'Cache-Control': 'no-cache'
+        }
+      });
+      
+      if (!pdfResponse.ok) {
+        throw new Error(`Failed to download PDF (Status: ${pdfResponse.status})`);
       }
       
-      console.log(`✅ PDF is accessible, proceeding with download...`);
+      const blob = await pdfResponse.blob();
+      console.log(`✅ PDF blob created, size: ${blob.size} bytes`);
       
-      // Method 1: Try direct download
+      // Verify blob is actually a PDF
+      if (blob.type && !blob.type.includes('pdf')) {
+        console.warn(`⚠️ Unexpected blob type: ${blob.type}`);
+      }
+      
+      // Create blob URL and download
+      const blobUrl = URL.createObjectURL(blob);
+      
       const link = document.createElement('a');
-      link.href = brand.catalog;
+      link.href = blobUrl;
       link.download = `${brand.name}-Catalog.pdf`;
       link.target = '_blank';
       link.rel = 'noopener noreferrer';
@@ -83,41 +108,68 @@ export default function Home() {
       link.click();
       document.body.removeChild(link);
       
-      console.log(`✅ Download initiated for ${brand.name}`);
+      // Clean up blob URL after a delay
+      setTimeout(() => {
+        URL.revokeObjectURL(blobUrl);
+        console.log(`🗑️ Blob URL cleaned up for ${brand.name}`);
+      }, 30000);
+      
+      console.log(`✅ Blob download initiated for ${brand.name}`);
       
       // Show user feedback with more information
-      alert(`${brand.name} catalog download started!\n\nFile size: ${brandSizes[brand.name as keyof typeof brandSizes]?.size || 'Unknown'}\nThe PDF will be saved to your Downloads folder.\n\nIf download doesn't start, please check your browser's download settings.`);
+      alert(`${brand.name} catalog download started!\n\nFile size: ${brandSizes[brand.name as keyof typeof brandSizes]?.size || 'Unknown'}\nDownloaded as: ${brand.name}-Catalog.pdf\n\nThe PDF will be saved to your Downloads folder.\n\nThis method should prevent file corruption.`);
       
     } catch (error) {
-      console.error(`❌ Download failed for ${brand.name}:`, error);
+      console.error(`❌ Blob download failed for ${brand.name}:`, error);
       
-      // Method 2: Try opening in new tab as fallback
+      // Method 2: Fallback to direct download
       try {
-        console.log(`🔄 Trying fallback method (new tab) for ${brand.name}...`);
-        const newWindow = window.open(brand.catalog, '_blank', 'noopener,noreferrer');
+        console.log(`🔄 Trying direct download fallback for ${brand.name}...`);
         
-        if (newWindow && !newWindow.closed) {
-          console.log(`✅ Opened ${brand.name} catalog in new tab`);
-          alert(`Download failed, but ${brand.name} catalog opened in new tab.\n\nYou can save it from there using Ctrl+S or Cmd+S.`);
-        } else {
-          throw new Error('New tab blocked or failed');
-        }
+        const link = document.createElement('a');
+        link.href = brand.catalog;
+        link.download = `${brand.name}-Catalog.pdf`;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
         
-      } catch (fallbackError) {
-        console.error(`❌ Fallback method also failed:`, fallbackError);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
         
-        // Method 3: Provide direct URL as last resort
-        const fullUrl = `${window.location.origin}${brand.catalog}`;
-        console.log(`📄 Providing direct URL: ${fullUrl}`);
+        console.log(`✅ Direct download attempted for ${brand.name}`);
+        alert(`${brand.name} catalog download started (direct method).\n\nIf you get a "file damaged" error, try the "Test PDF URL" button below to open it in your browser first.`);
         
-        alert(`Unable to download ${brand.name} catalog automatically.\n\nPossible solutions:\n1. Try right-clicking the download button and select "Save link as"\n2. Copy this direct link: ${fullUrl}\n3. Contact support if the issue persists\n\nError: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      } catch (directError) {
+        console.error(`❌ Direct download also failed:`, directError);
         
-        // Copy URL to clipboard if possible
+        // Method 3: Try opening in new tab as fallback
         try {
-          await navigator.clipboard.writeText(fullUrl);
-          console.log(`✅ URL copied to clipboard`);
-        } catch (clipboardError) {
-          console.log(`❌ Failed to copy to clipboard:`, clipboardError);
+          console.log(`🔄 Trying new tab fallback for ${brand.name}...`);
+          const newWindow = window.open(brand.catalog, '_blank', 'noopener,noreferrer');
+          
+          if (newWindow && !newWindow.closed) {
+            console.log(`✅ Opened ${brand.name} catalog in new tab`);
+            alert(`Download failed, but ${brand.name} catalog opened in new tab.\n\nTo save: Right-click in the PDF and select "Save as" or use Ctrl+S (Cmd+S on Mac).`);
+          } else {
+            throw new Error('New tab blocked or failed');
+          }
+          
+        } catch (fallbackError) {
+          console.error(`❌ All methods failed:`, fallbackError);
+          
+          // Method 4: Provide direct URL as last resort
+          const fullUrl = `${window.location.origin}${brand.catalog}`;
+          console.log(`📄 Providing direct URL: ${fullUrl}`);
+          
+          alert(`Unable to download ${brand.name} catalog automatically.\n\nPlease try these solutions:\n\n1. Copy this direct link: ${fullUrl}\n2. Right-click the "Download Catalog" button and select "Save link as"\n3. Try the "Test PDF URL" button to open in browser\n4. Contact support if the issue persists\n\nError: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          
+          // Copy URL to clipboard if possible
+          try {
+            await navigator.clipboard.writeText(fullUrl);
+            console.log(`✅ URL copied to clipboard`);
+          } catch (clipboardError) {
+            console.log(`❌ Failed to copy to clipboard:`, clipboardError);
+          }
         }
       }
     }
