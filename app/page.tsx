@@ -56,28 +56,55 @@ export default function Home() {
   };
 
   const openCatalog = (brand: { name: string; catalog: string }) => {
-    console.log(`Opening ${brand.name} catalog in modal viewer`);
+    console.log(`🎯 Opening ${brand.name} catalog`);
+    console.log(`📁 PDF URL: ${brand.catalog}`);
+    console.log(`🌐 Full URL: ${window.location.origin}${brand.catalog}`);
+    
     setSelectedPDF({ url: brand.catalog, brand: brand.name });
     setModalOpen(true);
   };
 
   const openCatalogInNewTab = (brand: { name: string; catalog: string }) => {
-    console.log(`Opening ${brand.name} catalog in new tab`);
+    console.log(`🆕 Opening ${brand.name} catalog in new tab`);
+    console.log(`📁 PDF URL: ${brand.catalog}`);
+    
     try {
-      const newWindow = window.open(brand.catalog, '_blank');
-      if (!newWindow) {
-        // Fallback if popup is blocked
-        window.location.href = brand.catalog;
+      // Test multiple methods for new tab opening
+      const fullUrl = brand.catalog;
+      console.log(`🔗 Trying URL: ${fullUrl}`);
+      
+      // Method 1: Direct window.open
+      const newWindow = window.open(fullUrl, '_blank', 'noopener,noreferrer');
+      if (newWindow && !newWindow.closed) {
+        console.log(`✅ New tab opened successfully for ${brand.name}`);
+        newWindow.focus();
+        return;
       }
+      
+      console.log(`⚠️ New tab blocked, trying alternative method`);
+      
+      // Method 2: Create and click link
+      const link = document.createElement('a');
+      link.href = fullUrl;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      console.log(`✅ Alternative method attempted for ${brand.name}`);
+      
     } catch (error) {
-      console.error('Failed to open in new tab:', error);
+      console.error(`❌ New tab failed for ${brand.name}:`, error);
       // Fallback to modal
       openCatalog(brand);
     }
   };
 
   const downloadCatalog = (brand: { name: string; catalog: string }) => {
-    console.log(`Downloading ${brand.name} catalog`);
+    console.log(`📥 Downloading ${brand.name} catalog`);
+    console.log(`📁 PDF URL: ${brand.catalog}`);
+    
     try {
       const link = document.createElement('a');
       link.href = brand.catalog;
@@ -86,8 +113,10 @@ export default function Home() {
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+      
+      console.log(`✅ Download initiated for ${brand.name}`);
     } catch (error) {
-      console.error('Download failed:', error);
+      console.error(`❌ Download failed for ${brand.name}:`, error);
       // Fallback to opening in new tab
       openCatalogInNewTab(brand);
     }
@@ -204,6 +233,30 @@ export default function Home() {
                               >
                                 <i className="ri-download-line mr-1"></i>
                                 Download
+                              </button>
+                              
+                              {/* Debug Test Button */}
+                              <button 
+                                className="flex-1 flex items-center justify-center text-purple-600 hover:text-purple-700 hover:bg-purple-50 transition-colors py-1 px-2 rounded text-xs"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  console.log(`🔍 Testing ${brand.name} PDF`);
+                                  console.log(`📁 URL: ${brand.catalog}`);
+                                  fetch(brand.catalog, { method: 'HEAD' })
+                                    .then(response => {
+                                      console.log(`✅ ${brand.name} PDF Status:`, response.status);
+                                      console.log(`📋 Content-Type:`, response.headers.get('content-type'));
+                                      alert(`${brand.name} PDF Test: ${response.status === 200 ? 'ACCESSIBLE' : 'NOT ACCESSIBLE'}`);
+                                    })
+                                    .catch(error => {
+                                      console.error(`❌ ${brand.name} PDF Error:`, error);
+                                      alert(`${brand.name} PDF Test: ERROR - ${error.message}`);
+                                    });
+                                }}
+                                title="Test PDF URL"
+                              >
+                                <i className="ri-bug-line mr-1"></i>
+                                Test
                               </button>
                             </div>
                           </div>

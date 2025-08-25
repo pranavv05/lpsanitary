@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 
 interface PDFViewerModalProps {
   isOpen: boolean;
@@ -10,68 +10,77 @@ interface PDFViewerModalProps {
 }
 
 export default function PDFViewerModal({ isOpen, onClose, pdfUrl, brandName }: PDFViewerModalProps) {
-  const [iframeLoaded, setIframeLoaded] = useState(false);
-  const [showError, setShowError] = useState(false);
-  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const [showIframe, setShowIframe] = useState(true);
+  const [loadingTime, setLoadingTime] = useState(0);
 
-  // Reset state when modal opens
   useEffect(() => {
     if (isOpen) {
-      setIframeLoaded(false);
-      setShowError(false);
+      setShowIframe(true);
+      setLoadingTime(0);
+      
+      // Start loading timer
+      const timer = setInterval(() => {
+        setLoadingTime(prev => prev + 1);
+      }, 1000);
+      
+      // Auto-show fallback options after 5 seconds
+      const fallbackTimer = setTimeout(() => {
+        console.log(`PDF taking time to load for ${brandName}, showing options`);
+      }, 5000);
+      
+      return () => {
+        clearInterval(timer);
+        clearTimeout(fallbackTimer);
+      };
     }
-  }, [isOpen, pdfUrl]);
-
-  const handleIframeLoad = () => {
-    console.log(`PDF loaded successfully for ${brandName}`);
-    setIframeLoaded(true);
-    setShowError(false);
-  };
-
-  const handleIframeError = () => {
-    console.log(`PDF iframe failed for ${brandName}, showing alternative options`);
-    setShowError(true);
-    setIframeLoaded(true); // Hide loading state
-  };
+  }, [isOpen, brandName]);
 
   const openInNewTab = () => {
+    console.log(`Opening ${brandName} PDF in new tab: ${pdfUrl}`);
     try {
-      console.log(`Opening ${brandName} catalog in new tab`);
-      // Use window.open with the PDF URL directly
-      const newWindow = window.open(pdfUrl, '_blank');
-      if (!newWindow) {
-        // If popup is blocked, try a different approach
-        const link = document.createElement('a');
-        link.href = pdfUrl;
-        link.target = '_blank';
-        link.rel = 'noopener noreferrer';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+      // Method 1: Direct window.open
+      const newTab = window.open(pdfUrl, '_blank', 'noopener,noreferrer');
+      if (newTab) {
+        newTab.focus();
+        return;
       }
+      
+      // Method 2: Create link and click
+      const link = document.createElement('a');
+      link.href = pdfUrl;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
     } catch (error) {
-      console.error('Failed to open in new tab:', error);
-      // Fallback to download
+      console.error('New tab failed:', error);
       downloadPDF();
     }
   };
 
   const downloadPDF = () => {
+    console.log(`Downloading ${brandName} PDF: ${pdfUrl}`);
     try {
-      console.log(`Downloading ${brandName} catalog`);
       const link = document.createElement('a');
       link.href = pdfUrl;
       link.download = `${brandName}-Catalog.pdf`;
-      link.target = '_blank';
-      link.rel = 'noopener noreferrer';
-      
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
     } catch (error) {
       console.error('Download failed:', error);
-      alert(`Unable to download ${brandName} catalog. Please try the direct link: ${pdfUrl}`);
+      // Show direct link as last resort
+      window.location.href = pdfUrl;
     }
+  };
+
+  const copyLink = () => {
+    navigator.clipboard.writeText(window.location.origin + pdfUrl).then(() => {
+      alert('PDF link copied to clipboard!');
+    }).catch(() => {
+      alert(`PDF Link: ${window.location.origin + pdfUrl}`);
+    });
   };
 
   if (!isOpen) return null;
@@ -80,98 +89,136 @@ export default function PDFViewerModal({ isOpen, onClose, pdfUrl, brandName }: P
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75">
       <div className="bg-white rounded-lg shadow-xl w-full max-w-6xl h-full max-h-[90vh] flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b bg-gray-50">
+        <div className="flex items-center justify-between p-4 border-b bg-gradient-to-r from-blue-50 to-purple-50">
           <div>
-            <h2 className="text-xl font-semibold text-gray-800">
+            <h2 className="text-xl font-bold text-gray-800">
               {brandName} Product Catalog
             </h2>
-            <p className="text-sm text-gray-600 mt-1">
-              PDF Catalog Viewer
+            <p className="text-sm text-gray-600">
+              Loading time: {loadingTime}s
             </p>
           </div>
           <div className="flex items-center space-x-2">
             <button
               onClick={openInNewTab}
-              className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center"
-              title="Open in new tab"
+              className="px-3 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center font-medium"
             >
               <i className="ri-external-link-line mr-2"></i>
-              New Tab
+              Open in New Tab
             </button>
             <button
               onClick={downloadPDF}
-              className="px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center"
-              title="Download PDF"
+              className="px-3 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center font-medium"
             >
               <i className="ri-download-line mr-2"></i>
               Download
             </button>
             <button
+              onClick={copyLink}
+              className="px-3 py-2 text-sm bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center font-medium"
+            >
+              <i className="ri-link mr-2"></i>
+              Copy Link
+            </button>
+            <button
               onClick={onClose}
-              className="text-gray-500 hover:text-gray-700 text-2xl font-bold p-1 hover:bg-gray-200 rounded"
-              title="Close"
+              className="text-gray-500 hover:text-gray-700 text-2xl font-bold p-2 hover:bg-gray-200 rounded"
             >
               ×
             </button>
           </div>
         </div>
 
-        {/* Content */}
+        {/* Content Area */}
         <div className="flex-1 relative bg-gray-100">
-          {/* Loading indicator */}
-          {!iframeLoaded && !showError && (
-            <div className="absolute inset-0 flex items-center justify-center bg-gray-100 z-10">
-              <div className="text-center">
-                <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-                <p className="text-gray-800 font-medium mb-2">Loading {brandName} Catalog</p>
-                <p className="text-gray-600 text-sm">Please wait...</p>
-              </div>
-            </div>
-          )}
-
-          {/* Error state */}
-          {showError && (
-            <div className="absolute inset-0 flex items-center justify-center bg-gray-100 z-10">
+          {showIframe ? (
+            <>
+              {/* Loading overlay */}
+              {loadingTime < 3 && (
+                <div className="absolute inset-0 bg-white bg-opacity-90 flex items-center justify-center z-20">
+                  <div className="text-center">
+                    <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                    <p className="text-lg font-semibold text-gray-800 mb-2">Loading {brandName} Catalog</p>
+                    <p className="text-gray-600 mb-4">Please wait while we load your PDF...</p>
+                    <div className="space-x-2">
+                      <button
+                        onClick={openInNewTab}
+                        className="px-4 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                      >
+                        Try New Tab
+                      </button>
+                      <button
+                        onClick={downloadPDF}
+                        className="px-4 py-2 text-sm bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
+                      >
+                        Download Instead
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              {/* PDF iframe with multiple fallback sources */}
+              <iframe
+                src={pdfUrl}
+                className="w-full h-full border-none"
+                title={`${brandName} Product Catalog`}
+                onLoad={() => console.log(`PDF loaded for ${brandName}`)}
+                onError={() => {
+                  console.log(`PDF iframe failed for ${brandName}`);
+                  setShowIframe(false);
+                }}
+              />
+            </>
+          ) : (
+            /* Fallback when iframe fails */
+            <div className="flex items-center justify-center h-full">
               <div className="text-center p-8 max-w-md">
-                <div className="text-blue-500 text-4xl mb-4">
+                <div className="text-6xl text-blue-500 mb-6">
                   <i className="ri-file-pdf-line"></i>
                 </div>
-                <h3 className="text-lg font-semibold text-gray-800 mb-2">
-                  PDF Viewer Not Available
+                <h3 className="text-2xl font-bold text-gray-800 mb-4">
+                  {brandName} Catalog
                 </h3>
-                <p className="text-gray-700 text-sm mb-4">
-                  The built-in PDF viewer couldn't load the catalog. Please use one of the options below:
+                <p className="text-gray-600 mb-6">
+                  The PDF viewer couldn't load in this browser. Please use one of the options below to access the catalog:
                 </p>
                 <div className="space-y-3">
                   <button
                     onClick={openInNewTab}
-                    className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center"
+                    className="w-full px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center font-medium"
                   >
-                    <i className="ri-external-link-line mr-2"></i>
+                    <i className="ri-external-link-line mr-3"></i>
                     Open in New Tab
                   </button>
                   <button
                     onClick={downloadPDF}
-                    className="w-full px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center"
+                    className="w-full px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center font-medium"
                   >
-                    <i className="ri-download-line mr-2"></i>
+                    <i className="ri-download-line mr-3"></i>
                     Download PDF
                   </button>
+                  <button
+                    onClick={copyLink}
+                    className="w-full px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center justify-center font-medium"
+                  >
+                    <i className="ri-link mr-3"></i>
+                    Copy Direct Link
+                  </button>
+                  <button
+                    onClick={() => setShowIframe(true)}
+                    className="w-full px-6 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors flex items-center justify-center font-medium"
+                  >
+                    <i className="ri-refresh-line mr-3"></i>
+                    Try Again
+                  </button>
                 </div>
+                <p className="text-xs text-gray-500 mt-4">
+                  Direct URL: {window.location.origin + pdfUrl}
+                </p>
               </div>
             </div>
           )}
-
-          {/* PDF iframe */}
-          <iframe
-            ref={iframeRef}
-            src={pdfUrl}
-            className="w-full h-full border-none"
-            title={`${brandName} Product Catalog`}
-            onLoad={handleIframeLoad}
-            onError={handleIframeError}
-            style={{ minHeight: '600px' }}
-          />
         </div>
       </div>
     </div>
