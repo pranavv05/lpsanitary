@@ -4,35 +4,36 @@ import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
+import PDFViewerModal from '@/components/PDFViewerModal';
+import { cloudCatalogs, CloudCatalog, getConfigStatus } from '@/config/cloudConfig';
+import { runCloudinaryTest } from '@/utils/cloudinaryTest';
 
 export default function Home() {
   const [currentSlide, setCurrentSlide] = useState(0);
 
-  // --- MODIFIED SECTION START ---
-  // Updated the 'catalog' paths to point to your local files
-  // in the public/resources/ directory.
-  // Add file size information for user awareness
-  const brandSizes = {
-    'Blues': { size: '76 MB', warning: true },
-    'Jaquar': { size: '60 MB', warning: true },
-    'Steellera': { size: '32 MB', warning: true },
-    'Karoma': { size: '21 MB', warning: false },
-    'Nirali': { size: '8 MB', warning: false },
-    'Cera': { size: '6 MB', warning: false },
-    'Roff': { size: '2 MB', warning: false }
-  } as const;
-
-  const brands = [
-    { name: 'Roff', catalog: '/resources/Roff-Product-Catalogue.pdf' },
-    { name: 'Jaquar', catalog: '/resources/JAQUAR_CATLOUGE.pdf' },
-    { name: 'Blues', catalog: '/resources/Blues_Catalougeupdated.pdf' },
-    { name: 'Nirali', catalog: '/resources/Nirali.pdf' },
-    { name: 'Karoma', catalog: '/resources/karoma_product_brochure_01.pdf' },
-    { name: 'Cera', catalog: '/resources/cera.pdf' },
-    { name: 'Steellera', catalog: '/resources/brochure_steelera_2023-24.pdf' },
-    // { name: 'American Standard', catalog: '/resources/American-Standard.pdf' }
+  // --- CLOUD STORAGE SECTION ---
+  // Now using cloud storage configuration for unlimited catalogs
+  // Catalogs are loaded from cloud storage and viewed in modal
+  const [selectedPDF, setSelectedPDF] = useState<CloudCatalog | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  
+  // Get cloud storage configuration status
+  const configStatus = getConfigStatus();
+  
+  // For backward compatibility, also support local files as fallback
+  const localBrands = [
+    { name: 'Roff', catalog: '/resources/Roff-Product-Catalogue.pdf', size: '2 MB' },
+    { name: 'Jaquar', catalog: '/resources/JAQUAR_CATLOUGE.pdf', size: '60 MB', warning: true },
+    { name: 'Blues', catalog: '/resources/Blues_Catalougeupdated.pdf', size: '76 MB', warning: true },
+    { name: 'Nirali', catalog: '/resources/Nirali.pdf', size: '8 MB' },
+    { name: 'Karoma', catalog: '/resources/karoma_product_brochure_01.pdf', size: '21 MB' },
+    { name: 'Cera', catalog: '/resources/cera.pdf', size: '6 MB' },
+    { name: 'Steellera', catalog: '/resources/brochure_steelera_2023-24.pdf', size: '32 MB', warning: true },
   ];
-  // --- MODIFIED SECTION END ---
+  
+  // Use cloud catalogs if configured, otherwise fall back to local
+  const brands = configStatus.status === 'configured' ? cloudCatalogs : localBrands;
+  // --- END CLOUD STORAGE SECTION ---
 
   const nextSlide = () => {
     setCurrentSlide((prev) => (prev + 1) % Math.ceil(brands.length / 4));
@@ -47,221 +48,45 @@ export default function Home() {
     return () => clearInterval(interval);
   }, []);
 
-  const downloadCatalog = async (brand: { name: string; catalog: string }) => {
-    console.log(`📥 Downloading ${brand.name} catalog`);
-    console.log(`📁 PDF URL: ${brand.catalog}`);
-    console.log(`🌐 Full URL: ${window.location.origin}${brand.catalog}`);
+  const viewCatalog = (brand: CloudCatalog | typeof localBrands[0]) => {
+    console.log(`👁️ Viewing ${brand.name} catalog`);
     
-    // Extract filename from catalog path
-    const filename = brand.catalog.split('/').pop();
-    const apiUrl = `/api/pdf/${filename}`;
-    let useApiRoute = false; // Initialize outside try block
+    // Convert local brand format to CloudCatalog format if needed
+    const catalogData: CloudCatalog = 'cloudUrl' in brand ? brand : {
+      name: brand.name,
+      filename: brand.catalog?.split('/').pop() || '',
+      size: brand.size,
+      cloudUrl: brand.catalog || '' // Use local path as fallback
+    };
     
+    setSelectedPDF(catalogData);
+    setIsModalOpen(true);
+    
+    console.log(`✅ Opening ${catalogData.name} catalog in modal viewer`);
+    console.log(`📁 PDF URL: ${catalogData.cloudUrl}`);
+  };
+  
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setSelectedPDF(null);
+  };
+  
+  const testCloudinarySetup = async () => {
+    console.log('🔬 Testing Cloudinary configuration...');
     try {
-      // Method 1: Try API route first (guaranteed headers in production)
-      console.log(`🔍 Testing API route for ${brand.name}: ${apiUrl}...`);
+      const results = await runCloudinaryTest();
       
-      const apiResponse = await fetch(apiUrl, { 
-        method: 'HEAD',
-        headers: {
-          'Accept': 'application/pdf,*/*',
-          'Cache-Control': 'no-cache'
-        }
-      });
-      
-      useApiRoute = apiResponse.ok;
-      console.log(`📊 API Route Status: ${apiResponse.status} - ${useApiRoute ? 'Available' : 'Fallback to static'}`);
-      
-      // Choose the best URL based on availability
-      const pdfUrl = useApiRoute ? apiUrl : brand.catalog;
-      console.log(`📦 Using ${useApiRoute ? 'API route' : 'static file'}: ${pdfUrl}`);
-      
-      // Test if the PDF is accessible
-      const response = await fetch(pdfUrl, { 
-        method: 'HEAD',
-        headers: {
-          'Accept': 'application/pdf,*/*',
-          'Cache-Control': 'no-cache'
-        }
-      });
-      
-      console.log(`📊 PDF Response Status: ${response.status}`);
-      console.log(`📋 Content-Type: ${response.headers.get('content-type')}`);
-      console.log(`💾 Content-Length: ${response.headers.get('content-length')}`);
-      
-      if (!response.ok) {
-        throw new Error(`PDF not accessible (Status: ${response.status})`);
+      if (results && results.successfulTests === results.totalCatalogs) {
+        alert(`🎉 Cloudinary Test Successful!\n\nAll ${results.totalCatalogs} catalogs are accessible from Cloudinary.\n\nYour setup is working perfectly!`);
+      } else if (results) {
+        alert(`⚠️ Cloudinary Test Results:\n\nSuccessful: ${results.successfulTests}/${results.totalCatalogs}\nFailed: ${results.failedTests.length}\n\nCheck the browser console for detailed error information.`);
       }
-      
-      // Method 2: Try blob-based download for better integrity
-      console.log(`📦 Downloading PDF as blob for ${brand.name}...`);
-      
-      const pdfResponse = await fetch(pdfUrl, {
-        headers: {
-          'Accept': 'application/pdf,*/*',
-          'Cache-Control': 'no-cache'
-        }
-      });
-      
-      if (!pdfResponse.ok) {
-        // If it's a 400 error, try to get the error details
-        if (pdfResponse.status === 400) {
-          try {
-            const errorDetails = await pdfResponse.json();
-            console.error(`❌ API returned 400 error for ${brand.name}:`, errorDetails);
-            throw new Error(`API Error (400): ${errorDetails.error} - ${errorDetails.details || 'No details'}`);
-          } catch (jsonError) {
-            console.error(`❌ Failed to parse 400 error response:`, jsonError);
-            throw new Error(`API Error (400): Unable to parse error response`);
-          }
-        }
-        throw new Error(`Failed to download PDF (Status: ${pdfResponse.status})`);
-      }
-      
-      const blob = await pdfResponse.blob();
-      console.log(`✅ PDF blob created, size: ${blob.size} bytes`);
-      
-      // Check if blob size is reasonable (should be at least 1KB for a real PDF)
-      if (blob.size < 1024) {
-        console.warn(`⚠️ Blob size too small (${blob.size} bytes), likely an error response`);
-        throw new Error(`Blob size too small: ${blob.size} bytes`);
-      }
-      
-      // Verify blob is actually a PDF
-      if (blob.type && !blob.type.includes('pdf')) {
-        console.warn(`⚠️ Unexpected blob type: ${blob.type}`);
-      }
-      
-      // Create blob URL and download
-      const blobUrl = URL.createObjectURL(blob);
-      
-      const link = document.createElement('a');
-      link.href = blobUrl;
-      link.download = `${brand.name}-Catalog.pdf`;
-      link.target = '_blank';
-      link.rel = 'noopener noreferrer';
-      
-      // Add to page, click, and remove
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      
-      // Clean up blob URL after a delay
-      setTimeout(() => {
-        URL.revokeObjectURL(blobUrl);
-        console.log(`🗑️ Blob URL cleaned up for ${brand.name}`);
-      }, 30000);
-      
-      console.log(`✅ Blob download initiated for ${brand.name}`);
-      
-      // Show user feedback with more information
-      alert(`${brand.name} catalog download started!\n\nFile size: ${brandSizes[brand.name as keyof typeof brandSizes]?.size || 'Unknown'}\nDownloaded as: ${brand.name}-Catalog.pdf\n\nThe PDF will be saved to your Downloads folder.\n\nUsing ${useApiRoute ? 'API route' : 'static file'} method to prevent corruption.`);
-      
     } catch (error) {
-      console.error(`❌ Primary download failed for ${brand.name}:`, error);
-      
-      // If it's a validation error (400), try static file immediately
-      if (error instanceof Error && error.message.includes('API Error (400)')) {
-        console.log(`🔄 API validation failed, trying static file immediately for ${brand.name}...`);
-        
-        try {
-          const staticResponse = await fetch(brand.catalog, {
-            headers: {
-              'Accept': 'application/pdf,*/*',
-              'Cache-Control': 'no-cache'
-            }
-          });
-          
-          if (staticResponse.ok) {
-            const staticBlob = await staticResponse.blob();
-            
-            if (staticBlob.size > 1024) { // Ensure it's a reasonable size
-              console.log(`✅ Static file download successful for ${brand.name}, size: ${staticBlob.size} bytes`);
-              
-              const blobUrl = URL.createObjectURL(staticBlob);
-              const link = document.createElement('a');
-              link.href = blobUrl;
-              link.download = `${brand.name}-Catalog.pdf`;
-              link.target = '_blank';
-              link.rel = 'noopener noreferrer';
-              
-              document.body.appendChild(link);
-              link.click();
-              document.body.removeChild(link);
-              
-              setTimeout(() => {
-                URL.revokeObjectURL(blobUrl);
-                console.log(`🗑️ Static blob URL cleaned up for ${brand.name}`);
-              }, 30000);
-              
-              alert(`${brand.name} catalog downloaded successfully using static file!\n\nFile size: ${brandSizes[brand.name as keyof typeof brandSizes]?.size || 'Unknown'}\nDownloaded as: ${brand.name}-Catalog.pdf\n\nThe PDF should now open correctly.`);
-              return; // Success, exit function
-            }
-          }
-        } catch (staticError) {
-          console.error(`❌ Static file fallback also failed:`, staticError);
-        }
-      }
-      
-      // Method 2: Fallback to direct download
-      try {
-        console.log(`🔄 Trying direct download fallback for ${brand.name}...`);
-        
-        // Try API route first, then static file
-        const fallbackUrl = useApiRoute ? apiUrl : brand.catalog;
-        
-        const link = document.createElement('a');
-        link.href = fallbackUrl;
-        link.download = `${brand.name}-Catalog.pdf`;
-        link.target = '_blank';
-        link.rel = 'noopener noreferrer';
-        
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        
-        console.log(`✅ Direct download attempted for ${brand.name}`);
-        alert(`${brand.name} catalog download started (direct method).\n\nUsing ${useApiRoute ? 'API route' : 'static file'} for better reliability.\n\nIf you get a "file damaged" error, try the "Test PDF URL" button below.`);
-        
-      } catch (directError) {
-        console.error(`❌ Direct download also failed:`, directError);
-        
-        // Method 3: Try opening in new tab as fallback
-        try {
-          console.log(`🔄 Trying new tab fallback for ${brand.name}...`);
-          const fallbackUrl = useApiRoute ? apiUrl : brand.catalog;
-          const newWindow = window.open(fallbackUrl, '_blank', 'noopener,noreferrer');
-          
-          if (newWindow && !newWindow.closed) {
-            console.log(`✅ Opened ${brand.name} catalog in new tab`);
-            alert(`Download failed, but ${brand.name} catalog opened in new tab.\n\nTo save: Right-click in the PDF and select "Save as" or use Ctrl+S (Cmd+S on Mac).`);
-          } else {
-            throw new Error('New tab blocked or failed');
-          }
-          
-        } catch (fallbackError) {
-          console.error(`❌ All methods failed:`, fallbackError);
-          
-          // Method 4: Provide direct URLs as last resort
-          const staticUrl = `${window.location.origin}${brand.catalog}`;
-          const apiUrlFull = `${window.location.origin}${apiUrl}`;
-          const debugUrl = `${window.location.origin}/api/debug`;
-          console.log(`📄 Providing direct URLs - API: ${apiUrlFull}, Static: ${staticUrl}`);
-          console.log(`🔍 Debug info available at: ${debugUrl}`);
-          
-          alert(`Unable to download ${brand.name} catalog automatically.\n\nPlease try these solutions:\n\n1. API Route: ${apiUrlFull}\n2. Static File: ${staticUrl}\n3. Right-click the "Download Catalog" button and select "Save link as"\n4. Try the "Test PDF URL" button to open in browser\n5. Debug info: ${debugUrl}\n6. Contact support if the issue persists\n\nError: ${error instanceof Error ? error.message : 'Unknown error'}`);
-          
-          // Copy URLs to clipboard if possible
-          try {
-            await navigator.clipboard.writeText(`API Route: ${apiUrlFull}\nStatic File: ${staticUrl}\nDebug: ${debugUrl}`);
-            console.log(`✅ URLs copied to clipboard`);
-          } catch (clipboardError) {
-            console.log(`❌ Failed to copy to clipboard:`, clipboardError);
-          }
-        }
-      }
+      console.error('Test failed:', error);
+      alert(`❌ Test failed: ${error instanceof Error ? error.message : 'Unknown error'}\n\nCheck the browser console for more details.`);
     }
   };
+
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
@@ -327,60 +152,89 @@ export default function Home() {
                           </div>
                           <div className="text-gray-600 mb-1">Premium Quality</div>
                           
+                          {/* Storage Provider Indicator */}
+                          <div className="text-xs mb-2 flex items-center justify-center">
+                            {'storage' in brand ? (
+                              brand.storage === 'cloudinary' ? (
+                                <div className="text-blue-600 flex items-center">
+                                  <i className="ri-cloud-line mr-1"></i>
+                                  Cloudinary
+                                </div>
+                              ) : brand.storage === 's3' ? (
+                                <div className="text-orange-600 flex items-center">
+                                  <i className="ri-database-line mr-1"></i>
+                                  AWS S3
+                                </div>
+                              ) : brand.storage === 'github' ? (
+                                <div className="text-purple-600 flex items-center">
+                                  <i className="ri-github-line mr-1"></i>
+                                  GitHub
+                                </div>
+                              ) : brand.storage === 'gdrive' ? (
+                                <div className="text-green-600 flex items-center">
+                                  <i className="ri-google-line mr-1"></i>
+                                  Google Drive
+                                </div>
+                              ) : (
+                                <div className="text-gray-600 flex items-center">
+                                  <i className="ri-hard-drive-line mr-1"></i>
+                                  Local
+                                </div>
+                              )
+                            ) : (
+                              configStatus.status === 'configured' ? (
+                                <div className="text-green-600 flex items-center">
+                                  <i className="ri-cloud-line mr-1"></i>
+                                  Cloud Storage
+                                </div>
+                              ) : (
+                                <div className="text-amber-600 flex items-center">
+                                  <i className="ri-hard-drive-line mr-1"></i>
+                                  Local Files
+                                </div>
+                              )
+                            )}
+                          </div>
+                          
                           {/* File Size Indicator */}
                           <div className="text-xs text-gray-500 mb-4">
-                            {brandSizes[brand.name as keyof typeof brandSizes]?.size || 'Loading...'}
-                            {brandSizes[brand.name as keyof typeof brandSizes]?.warning && (
+                            {'size' in brand ? brand.size : 'Loading...'}
+                            {('warning' in brand && brand.warning) && (
                               <span className="text-amber-600 ml-1" title="Large file">
                                 <i className="ri-information-line"></i>
                               </span>
                             )}
                           </div>
                           
-                          {/* Simple Download Button */}
+                          {/* View Catalog Button */}
                           <div className="space-y-2">
                             <button 
-                              className="w-full flex items-center justify-center text-white bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-700 hover:to-blue-700 transition-all duration-300 py-3 px-4 rounded-lg font-medium shadow-lg hover:shadow-xl"
-                              onClick={() => downloadCatalog(brand)}
+                              className="w-full flex items-center justify-center text-white bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 transition-all duration-300 py-3 px-4 rounded-lg font-medium shadow-lg hover:shadow-xl"
+                              onClick={() => viewCatalog(brand)}
                             >
                               <div className="w-5 h-5 flex items-center justify-center mr-2">
-                                <i className="ri-download-cloud-line"></i>
+                                <i className="ri-eye-line"></i>
                               </div>
-                              <span>Download Catalog</span>
+                              <span>View Catalog</span>
                             </button>
                             
-                            {/* Test URL Button - Small */}
+                            {/* Quick Preview Button - Small */}
                             <button 
-                              className="w-full text-xs text-gray-600 hover:text-blue-600 transition-colors py-1"
-                              onClick={async () => {
-                                const filename = brand.catalog.split('/').pop();
-                                const apiUrl = `/api/pdf/${filename}`;
-                                
-                                // Test API route first
-                                try {
-                                  const apiResponse = await fetch(apiUrl, { method: 'HEAD' });
-                                  if (apiResponse.ok) {
-                                    console.log(`🔍 Testing ${brand.name} API URL: ${window.location.origin}${apiUrl}`);
-                                    window.open(apiUrl, '_blank');
-                                    return;
-                                  }
-                                } catch (e) {
-                                  console.log('API route not available, using static file');
-                                }
-                                
-                                // Fallback to static file
-                                const fullUrl = `${window.location.origin}${brand.catalog}`;
-                                console.log(`🔍 Testing ${brand.name} PDF URL: ${fullUrl}`);
+                              className="w-full text-xs text-gray-600 hover:text-purple-600 transition-colors py-1"
+                              onClick={() => {
+                                const url = 'cloudUrl' in brand ? brand.cloudUrl : brand.catalog;
+                                const fullUrl = url?.startsWith('http') ? url : `${window.location.origin}${url}`;
+                                console.log(`🔍 Opening ${brand.name} in new tab: ${fullUrl}`);
                                 window.open(fullUrl, '_blank');
                               }}
-                              title="Test PDF URL in new tab"
+                              title="Open PDF in new tab"
                             >
                               <i className="ri-external-link-line mr-1"></i>
-                              Test PDF URL
+                              Open in New Tab
                             </button>
                             
                             {/* Debug button - only show for first brand to avoid clutter */}
-                            {index === 0 && (
+                            {index === 0 && configStatus.status !== 'configured' && (
                               <button 
                                 className="w-full text-xs text-amber-600 hover:text-amber-700 transition-colors py-1 mt-1"
                                 onClick={() => {
@@ -397,7 +251,10 @@ export default function Home() {
                           </div>
                           
                           <p className="text-xs text-gray-500 mt-2">
-                            Click to download PDF to your device
+                            {configStatus.status === 'configured' 
+                              ? 'Click to view PDF instantly in modal viewer' 
+                              : 'Click to view PDF (local files)'
+                            }
                           </p>
                         </div>
                       ))}
@@ -596,6 +453,93 @@ export default function Home() {
       </section>
 
       <Footer />
+      
+      {/* PDF Viewer Modal */}
+      {selectedPDF && (
+        <PDFViewerModal
+          isOpen={isModalOpen}
+          onClose={closeModal}
+          pdfUrl={selectedPDF.cloudUrl}
+          brandName={selectedPDF.name}
+          fileSize={selectedPDF.size}
+          filename={selectedPDF.filename}
+        />
+      )}
+      
+      {/* Hybrid Storage Configuration Notification */}
+      {configStatus.status === 'needs-setup' && (
+        <div className="fixed bottom-4 right-4 bg-blue-50 border border-blue-200 rounded-lg p-4 shadow-lg max-w-sm z-40">
+          <div className="flex items-start space-x-3">
+            <div className="flex-shrink-0">
+              <i className="ri-cloud-line text-blue-600 text-xl"></i>
+            </div>
+            <div>
+              <h4 className="text-sm font-semibold text-blue-800 mb-1">
+                Setup Hybrid Storage
+              </h4>
+              <p className="text-xs text-blue-700 mb-2">
+                {configStatus.message}
+              </p>
+              <p className="text-xs text-blue-600 mb-3">
+                Small files → Cloudinary (free) • Large files → AWS S3
+              </p>
+              <div className="space-y-2">
+                <button 
+                  onClick={() => {
+                    window.open('/HYBRID_STORAGE_SETUP.md', '_blank');
+                  }}
+                  className="text-xs bg-blue-600 text-white px-2 py-1 rounded hover:bg-blue-700 transition-colors w-full"
+                >
+                  📝 Setup Guide
+                </button>
+                <div className="grid grid-cols-2 gap-1">
+                  <button 
+                    onClick={() => {
+                      window.open('https://cloudinary.com/users/register/free', '_blank');
+                    }}
+                    className="text-xs bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600 transition-colors"
+                  >
+                    ☁️ Cloudinary
+                  </button>
+                  <button 
+                    onClick={() => {
+                      window.open('https://aws.amazon.com/s3/', '_blank');
+                    }}
+                    className="text-xs bg-orange-500 text-white px-2 py-1 rounded hover:bg-orange-600 transition-colors"
+                  >
+                    🌍 AWS S3
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Hybrid Storage Active Notification */}
+      {configStatus.status === 'configured' && (
+        <div className="fixed bottom-4 right-4 bg-green-50 border border-green-200 rounded-lg p-4 shadow-lg max-w-sm z-40">
+          <div className="flex items-start space-x-3">
+            <div className="flex-shrink-0">
+              <i className="ri-cloud-check-line text-green-600 text-xl"></i>
+            </div>
+            <div>
+              <h4 className="text-sm font-semibold text-green-800 mb-1">
+                Hybrid Storage Active
+              </h4>
+              <p className="text-xs text-green-700 mb-2">
+                Small files: Cloudinary • Large files: S3
+              </p>
+              <button 
+                onClick={testCloudinarySetup}
+                className="text-xs bg-green-600 text-white px-2 py-1 rounded hover:bg-green-700 transition-colors w-full"
+              >
+                🗺 Test All URLs
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
