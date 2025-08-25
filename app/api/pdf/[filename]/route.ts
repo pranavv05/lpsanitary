@@ -72,11 +72,35 @@ export async function GET(
     }
     
     // Verify it's actually a PDF
-    if (!fileBuffer.toString('ascii', 0, 4).includes('%PDF')) {
-      console.error(`[API] File is not a valid PDF: ${filename}`);
+    if (fileBuffer.length === 0) {
+      console.error(`[API] File is empty: ${filename}`);
       return NextResponse.json({ 
-        error: 'File is not a valid PDF',
-        filename
+        error: 'PDF file is empty',
+        filename,
+        size: fileBuffer.length
+      }, { status: 400 });
+    }
+    
+    if (fileBuffer.length < 4) {
+      console.error(`[API] File too small to be valid PDF: ${filename}, size: ${fileBuffer.length}`);
+      return NextResponse.json({ 
+        error: 'File too small to be a valid PDF',
+        filename,
+        size: fileBuffer.length
+      }, { status: 400 });
+    }
+    
+    // Check PDF signature more carefully
+    const firstBytes = fileBuffer.subarray(0, 4).toString('ascii');
+    if (!firstBytes.includes('%PDF')) {
+      console.error(`[API] File is not a valid PDF: ${filename}, first bytes: ${firstBytes}`);
+      console.error(`[API] File content preview:`, fileBuffer.subarray(0, Math.min(100, fileBuffer.length)).toString());
+      return NextResponse.json({ 
+        error: 'File is not a valid PDF - missing PDF header',
+        filename,
+        firstBytes,
+        size: fileBuffer.length,
+        preview: fileBuffer.subarray(0, Math.min(50, fileBuffer.length)).toString()
       }, { status: 400 });
     }
     
@@ -110,31 +134,51 @@ export async function GET(
     
   } catch (error) {
     console.error(`[API] Error serving PDF:`, error);
+    console.error(`[API] Error stack:`, error instanceof Error ? error.stack : 'No stack trace');
     
     // Detailed error response
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    const errorResponse = {
-      error: 'PDF file not found or could not be read',
-      details: errorMessage,
-      timestamp: new Date().toISOString(),
-      filename: 'unknown'
-    };
+    let filename = 'unknown';
     
     try {
       const params = await context.params;
-      errorResponse.filename = params.filename;
+      filename = params.filename;
+      console.error(`[API] Failed to serve PDF: ${filename}`);
     } catch (paramError) {
       console.error(`[API] Error getting params:`, paramError);
     }
     
+    const errorResponse = {
+      error: 'PDF file not found or could not be read',
+      details: errorMessage,
+      filename,
+      timestamp: new Date().toISOString(),
+      errorType: error instanceof Error ? error.constructor.name : typeof error,
+      cwd: process.cwd(),
+      environment: process.env.NODE_ENV
+    };
+    
     return NextResponse.json(errorResponse, { 
-      status: 404,
+      status: 500,
       headers: {
         'Content-Type': 'application/json',
         'Access-Control-Allow-Origin': '*',
       }
     });
   }
+}
+
+// Handle OPTIONS requests for CORS
+export async function OPTIONS(request: NextRequest) {
+  return new NextResponse(null, {
+    status: 200,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Accept, Range',
+      'Access-Control-Max-Age': '86400',
+    },
+  });
 }
 
 // Handle HEAD requests for testing

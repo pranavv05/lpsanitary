@@ -104,6 +104,17 @@ export default function Home() {
       });
       
       if (!pdfResponse.ok) {
+        // If it's a 400 error, try to get the error details
+        if (pdfResponse.status === 400) {
+          try {
+            const errorDetails = await pdfResponse.json();
+            console.error(`❌ API returned 400 error for ${brand.name}:`, errorDetails);
+            throw new Error(`API Error (400): ${errorDetails.error} - ${errorDetails.details || 'No details'}`);
+          } catch (jsonError) {
+            console.error(`❌ Failed to parse 400 error response:`, jsonError);
+            throw new Error(`API Error (400): Unable to parse error response`);
+          }
+        }
         throw new Error(`Failed to download PDF (Status: ${pdfResponse.status})`);
       }
       
@@ -148,6 +159,49 @@ export default function Home() {
       
     } catch (error) {
       console.error(`❌ Primary download failed for ${brand.name}:`, error);
+      
+      // If it's a validation error (400), try static file immediately
+      if (error instanceof Error && error.message.includes('API Error (400)')) {
+        console.log(`🔄 API validation failed, trying static file immediately for ${brand.name}...`);
+        
+        try {
+          const staticResponse = await fetch(brand.catalog, {
+            headers: {
+              'Accept': 'application/pdf,*/*',
+              'Cache-Control': 'no-cache'
+            }
+          });
+          
+          if (staticResponse.ok) {
+            const staticBlob = await staticResponse.blob();
+            
+            if (staticBlob.size > 1024) { // Ensure it's a reasonable size
+              console.log(`✅ Static file download successful for ${brand.name}, size: ${staticBlob.size} bytes`);
+              
+              const blobUrl = URL.createObjectURL(staticBlob);
+              const link = document.createElement('a');
+              link.href = blobUrl;
+              link.download = `${brand.name}-Catalog.pdf`;
+              link.target = '_blank';
+              link.rel = 'noopener noreferrer';
+              
+              document.body.appendChild(link);
+              link.click();
+              document.body.removeChild(link);
+              
+              setTimeout(() => {
+                URL.revokeObjectURL(blobUrl);
+                console.log(`🗑️ Static blob URL cleaned up for ${brand.name}`);
+              }, 30000);
+              
+              alert(`${brand.name} catalog downloaded successfully using static file!\n\nFile size: ${brandSizes[brand.name as keyof typeof brandSizes]?.size || 'Unknown'}\nDownloaded as: ${brand.name}-Catalog.pdf\n\nThe PDF should now open correctly.`);
+              return; // Success, exit function
+            }
+          }
+        } catch (staticError) {
+          console.error(`❌ Static file fallback also failed:`, staticError);
+        }
+      }
       
       // Method 2: Fallback to direct download
       try {
