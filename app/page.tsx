@@ -5,32 +5,11 @@ import { useState, useEffect } from 'react';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import PDFViewerModal from '@/components/PDFViewerModal';
-import { openPDFCatalog, downloadPDFCatalog } from '@/utils/pdfHandler';
 
 export default function Home() {
   const [currentSlide, setCurrentSlide] = useState(0);
-  const [loadingCatalog, setLoadingCatalog] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedPDF, setSelectedPDF] = useState<{ url: string; brand: string } | null>(null);
-
-  // Cleanup effect to prevent stuck loading states
-  useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      if (loadingCatalog) {
-        console.warn(`Clearing stuck loading state for ${loadingCatalog}`);
-        setLoadingCatalog(null);
-      }
-    }, 10000); // 10 second global timeout
-
-    return () => clearTimeout(timeoutId);
-  }, [loadingCatalog]);
-
-  // Clear loading state when modal opens
-  useEffect(() => {
-    if (modalOpen) {
-      setLoadingCatalog(null);
-    }
-  }, [modalOpen]);
 
   // --- MODIFIED SECTION START ---
   // Updated the 'catalog' paths to point to your local files
@@ -71,27 +50,47 @@ export default function Home() {
     return () => clearInterval(interval);
   }, []);
 
-  const downloadCatalog = (brand: { name: string; catalog: string }) => {
-    console.log(`User requested download for ${brand.name} catalog`);
-    downloadPDFCatalog(brand.catalog, brand.name);
+  const closeModal = () => {
+    setModalOpen(false);
+    setSelectedPDF(null);
   };
 
   const openCatalog = (brand: { name: string; catalog: string }) => {
-    console.log(`User clicked on ${brand.name} catalog - opening in modal viewer`);
-    
-    // Clear any existing loading state
-    setLoadingCatalog(null);
-    
-    // Open directly in modal to avoid black screen issues
+    console.log(`Opening ${brand.name} catalog in modal viewer`);
     setSelectedPDF({ url: brand.catalog, brand: brand.name });
     setModalOpen(true);
   };
 
-  const closeModal = () => {
-    setModalOpen(false);
-    setSelectedPDF(null);
-    // Ensure loading state is cleared when modal is closed
-    setLoadingCatalog(null);
+  const openCatalogInNewTab = (brand: { name: string; catalog: string }) => {
+    console.log(`Opening ${brand.name} catalog in new tab`);
+    try {
+      const newWindow = window.open(brand.catalog, '_blank');
+      if (!newWindow) {
+        // Fallback if popup is blocked
+        window.location.href = brand.catalog;
+      }
+    } catch (error) {
+      console.error('Failed to open in new tab:', error);
+      // Fallback to modal
+      openCatalog(brand);
+    }
+  };
+
+  const downloadCatalog = (brand: { name: string; catalog: string }) => {
+    console.log(`Downloading ${brand.name} catalog`);
+    try {
+      const link = document.createElement('a');
+      link.href = brand.catalog;
+      link.download = `${brand.name}-Catalog.pdf`;
+      link.target = '_blank';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (error) {
+      console.error('Download failed:', error);
+      // Fallback to opening in new tab
+      openCatalogInNewTab(brand);
+    }
   };
 
   return (
@@ -150,19 +149,16 @@ export default function Home() {
                       {brands.slice(slideIndex * 4, slideIndex * 4 + 4).map((brand, index) => (
                         <div 
                           key={index}
-                          className="bg-white rounded-xl p-8 text-center shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-2 hover:scale-105 cursor-pointer animate-fade-in-up group"
+                          className="bg-white rounded-xl p-8 text-center shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-2 hover:scale-105 animate-fade-in-up group"
                           style={{animationDelay: `${index * 100}ms`}}
                         >
-                          <div 
-                            className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-2 group-hover:from-purple-600 group-hover:to-pink-600 transition-all duration-300"
-                            onClick={() => openCatalog(brand)}
-                          >
+                          <div className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-2 group-hover:from-purple-600 group-hover:to-pink-600 transition-all duration-300">
                             {brand.name}
                           </div>
                           <div className="text-gray-600 mb-1">Premium Quality</div>
                           
                           {/* File Size Indicator */}
-                          <div className="text-xs text-gray-500 mb-3">
+                          <div className="text-xs text-gray-500 mb-4">
                             {brandSizes[brand.name as keyof typeof brandSizes]?.size || 'Loading...'}
                             {brandSizes[brand.name as keyof typeof brandSizes]?.warning && (
                               <span className="text-amber-600 ml-1" title="Large file - may take time to load">
@@ -173,31 +169,42 @@ export default function Home() {
                           
                           {/* Action Buttons */}
                           <div className="space-y-2">
-                            <div 
-                              className="flex items-center justify-center text-purple-600 hover:text-purple-700 transition-colors group-hover:scale-105 cursor-pointer"
+                            {/* Primary View Button */}
+                            <button 
+                              className="w-full flex items-center justify-center text-white bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 transition-all duration-300 py-2 px-4 rounded-lg font-medium"
                               onClick={() => openCatalog(brand)}
                             >
                               <div className="w-4 h-4 flex items-center justify-center mr-2">
                                 <i className="ri-eye-line"></i>
                               </div>
-                              <span className="text-sm font-medium">View Catalog</span>
-                              <div className="w-4 h-4 flex items-center justify-center ml-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <i className="ri-external-link-line text-xs"></i>
-                              </div>
-                            </div>
+                              <span className="text-sm">View Catalog</span>
+                            </button>
                             
-                            {/* Download Button */}
-                            <div 
-                              className="flex items-center justify-center text-green-600 hover:text-green-700 transition-colors cursor-pointer text-xs opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                downloadCatalog(brand);
-                              }}
-                            >
-                              <div className="w-3 h-3 flex items-center justify-center mr-1">
-                                <i className="ri-download-line"></i>
-                              </div>
-                              <span className="font-medium">Download PDF</span>
+                            {/* Secondary Options */}
+                            <div className="flex space-x-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                              <button 
+                                className="flex-1 flex items-center justify-center text-blue-600 hover:text-blue-700 hover:bg-blue-50 transition-colors py-1 px-2 rounded text-xs"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openCatalogInNewTab(brand);
+                                }}
+                                title="Open in new tab"
+                              >
+                                <i className="ri-external-link-line mr-1"></i>
+                                New Tab
+                              </button>
+                              
+                              <button 
+                                className="flex-1 flex items-center justify-center text-green-600 hover:text-green-700 hover:bg-green-50 transition-colors py-1 px-2 rounded text-xs"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  downloadCatalog(brand);
+                                }}
+                                title="Download PDF"
+                              >
+                                <i className="ri-download-line mr-1"></i>
+                                Download
+                              </button>
                             </div>
                           </div>
                         </div>
